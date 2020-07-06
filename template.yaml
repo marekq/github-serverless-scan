@@ -1,0 +1,47 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: 'AWS::Serverless-2016-10-31'
+Description: An AWS Serverless Specification template describing your function.
+
+Resources:
+  sqsqueue:
+    Type: AWS::SQS::Queue
+    Properties:
+      VisibilityTimeout: 60
+
+  gitpull:
+    Type: 'AWS::Serverless::Function'
+    Properties:
+      Layers:
+        - !Sub arn:aws:lambda:${AWS::Region}:553035198032:layer:git-lambda2:6
+      Runtime: python3.8
+      Handler: lambda.handler
+      CodeUri: lambda/
+      Description: 'Retrieve GitHub repositories, scan them  feeds and store them in DynamoDB'
+      Policies:
+        - DynamoDBCrudPolicy:
+            TableName: !Ref gittable
+      MemorySize: 128
+      Timeout: 20
+      Events:
+        sqstrigger:
+          Type: SQS
+          Properties:
+            Queue: !GetAtt sqsqueue.Arn
+            BatchSize: 1
+      Tracing: Active
+      ReservedConcurrentExecutions: 10
+
+  gittable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      AttributeDefinitions:
+      - AttributeName: gitrepo
+        AttributeType: S
+      - AttributeName: timest
+        AttributeType: S
+      KeySchema:
+      - AttributeName: gitrepo
+        KeyType: HASH
+      - AttributeName: timest
+        KeyType: RANGE  
+      BillingMode: PAY_PER_REQUEST
