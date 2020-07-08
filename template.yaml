@@ -16,6 +16,7 @@ Resources:
       Runtime: python3.8
       Handler: lambda.handler
       CodeUri: lambda/
+      Tracing: Active
       Description: 'Retrieve GitHub repositories, scan them  feeds and store them in DynamoDB'
       Policies:
         - DynamoDBCrudPolicy:
@@ -28,8 +29,24 @@ Resources:
           Properties:
             Queue: !GetAtt sqsqueue.Arn
             BatchSize: 1
-      Tracing: Active
       ReservedConcurrentExecutions: 10
+
+  discoverrepo:
+    Type: AWS::Serverless::Function
+    Properties:
+      MemorySize: 256
+      Timeout: 30
+      CodeUri: startscan/
+      Handler: startscan.handler
+      Runtime: python3.8
+      Tracing: Active
+      ReservedConcurrentExecutions: 1
+      Environment:
+        Variables:
+          sqsqueue: !Ref sqsqueue
+      Policies:
+        - SQSSendMessagePolicy:
+            QueueName: !GetAtt sqsqueue.QueueName
 
   gittable:
     Type: AWS::DynamoDB::Table
