@@ -2,6 +2,8 @@ import boto3, json, math, requests, os
 
 sqs         = boto3.client("sqs")
 sqsqueue    = os.environ["sqsqueue"] 
+githubrepo  = os.environ["githubrepo"]
+githuburl   = "https://api.github.com/users/" + githubrepo
 
 # send message to sqs
 def send_msg(x):
@@ -10,7 +12,7 @@ def send_msg(x):
 
 # get repo count
 def get_repo():
-    x       = requests.get("https://api.github.com/users/awslabs")
+    x       = requests.get(githuburl)
     z       = json.loads(x.text)
     pages   = math.ceil(z["public_repos"] / 100) + 1
     return pages
@@ -30,7 +32,7 @@ def handler(event, context):
     for x in range(int(pages)):
 
         print("getting page " + str(x))
-        x   = requests.get("https://api.github.com/users/awslabs/repos?page=" + str(x) + "&per_page=100")
+        x   = requests.get(githuburl + "/repos?page=" + str(x) + "&per_page=100")
         y   = json.loads(x.text)
 
         # add repo url to results and file
@@ -38,6 +40,7 @@ def handler(event, context):
             curl = a["clone_url"]
             if curl not in res:
                 res.append(curl)
+                print("sending " + curl)
                 f.write(curl+"\n")
 
     #close file and print result path

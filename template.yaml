@@ -21,7 +21,7 @@ Resources:
       Policies:
         - DynamoDBCrudPolicy:
             TableName: !Ref gittable
-      MemorySize: 128
+      MemorySize: 256
       Timeout: 20
       Events:
         sqstrigger:
@@ -44,6 +44,7 @@ Resources:
       Environment:
         Variables:
           sqsqueue: !Ref sqsqueue
+          githubrepo: "marekq"
       Policies:
         - SQSSendMessagePolicy:
             QueueName: !GetAtt sqsqueue.QueueName

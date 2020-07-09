@@ -36,7 +36,7 @@ def get_repo(giturl, tmppath):
     files = os.listdir(tmppath)
 
     # check content of yaml files
-    for root, dirs, files in os.walk(tmppath, topdown=False):
+    for root, dirs, files in os.walk(tmppath, topdown = False):
         for name in files:
             if re.search('.yml', name) or re.search('.yaml', name):
 
@@ -48,8 +48,6 @@ def get_repo(giturl, tmppath):
 
                 # scan the yaml file
                 check_yaml(fname, giturl)
-
-
 
 
 # check the yaml file for serverless lines
