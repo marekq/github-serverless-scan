@@ -1,4 +1,4 @@
-import re, os, shutil, subprocess
+import re, os, shutil, subprocess, tempfile
 
 yamlfiles  = []
 keywords   = []
@@ -18,36 +18,33 @@ load_keywords()
 
 
 # clone the given git repo to local disk, search for interesting yaml files
-def get_repo(giturl, tmppath):
-
-    # create the git output dir or clean the /tmp dir
-    if os.path.isdir(tmppath):
-        shutil.rmtree(tmppath)
+def get_repo(giturl):
     
-    os.makedirs(tmppath)
+    # create a temporary directory on /tmp to clone the repo
+    with tempfile.TemporaryDirectory() as tmppath:
 
-    # clone the git repo 
-    gitc = subprocess.Popen("git clone " + giturl + " " + tmppath, shell = True)
+        # clone the git repo 
+        gitc = subprocess.Popen("git clone " + giturl + " " + tmppath, shell = True)
 
-    # await for git command to complete
-    gitc.communicate()
+        # await for git command to complete
+        gitc.communicate()
 
-    # find yaml files
-    files = os.listdir(tmppath)
+        # find yaml files
+        files = os.listdir(tmppath)
 
-    # check content of yaml files
-    for root, dirs, files in os.walk(tmppath, topdown = False):
-        for name in files:
-            if re.search('.yml', name) or re.search('.yaml', name):
+        # check content of yaml files
+        for root, dirs, files in os.walk(tmppath, topdown = False):
+            for name in files:
+                if re.search('.yml', name) or re.search('.yaml', name):
 
-                # create variable with file name
-                fname = os.path.join(root, name)
+                    # create variable with file name
+                    fname = os.path.join(root, name)
 
-                # store yaml files in list
-                yamlfiles.append(fname)
+                    # store yaml files in list
+                    yamlfiles.append(fname)
 
-                # scan the yaml file
-                check_yaml(fname, giturl)
+                    # scan the yaml file
+                    check_yaml(fname, giturl)
 
 
 # check the yaml file for serverless lines
@@ -65,10 +62,8 @@ def handler(event, context):
     gitbase    = eventurl[:19]
     gitpath    = eventurl[19:]
 
-    tmppath    = "/tmp/" + gitpath
-
     # get the git repo
-    get_repo(eventurl, tmppath)
+    get_repo(eventurl)
 
     # print matched yaml files
     print(yamlfiles)

@@ -8,11 +8,25 @@ Resources:
     Properties:
       VisibilityTimeout: 60
 
+  gitpulllayer:
+    Type: AWS::Serverless::LayerVersion
+    Properties:
+      LayerName: gitlayer
+      Description: create a layer with gitpull tools
+      ContentUri: layer/.
+      CompatibleRuntimes:
+        - python3.8
+      LicenseInfo: MIT
+      RetentionPolicy: Delete
+    Metadata:
+      BuildMethod: python3.8
+
   gitpull:
-    Type: 'AWS::Serverless::Function'
+    Type: AWS::Serverless::Function
     Properties:
       Layers:
         - !Sub arn:aws:lambda:${AWS::Region}:553035198032:layer:git-lambda2:6
+        - !Ref gitpulllayer
       Runtime: python3.8
       Handler: lambda.handler
       CodeUri: lambda/
