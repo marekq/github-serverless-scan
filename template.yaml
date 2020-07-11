@@ -2,6 +2,12 @@ AWSTemplateFormatVersion: '2010-09-09'
 Transform: 'AWS::Serverless-2016-10-31'
 Description: An AWS Serverless Specification template describing your function.
 
+Parameters:
+  githubrepo:
+    Type: String
+    Description: The GitHub profile to scan (i.e. 'marekq' for https://github.com/marekq)
+    Default: marekq
+
 Resources:
   sqsqueue:
     Type: AWS::SQS::Queue
@@ -17,7 +23,7 @@ Resources:
       CompatibleRuntimes:
         - python3.8
       LicenseInfo: MIT
-      RetentionPolicy: Delete
+      RetentionPolicy: Retain
     Metadata:
       BuildMethod: python3.8
 
@@ -35,7 +41,7 @@ Resources:
       Policies:
         - DynamoDBCrudPolicy:
             TableName: !Ref gittable
-      MemorySize: 256
+      MemorySize: 1024
       Timeout: 20
       Events:
         sqstrigger:
@@ -58,7 +64,7 @@ Resources:
       Environment:
         Variables:
           sqsqueue: !Ref sqsqueue
-          githubrepo: "marekq"
+          githubrepo: !Ref githubrepo
       Policies:
         - SQSSendMessagePolicy:
             QueueName: !GetAtt sqsqueue.QueueName

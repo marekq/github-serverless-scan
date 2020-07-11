@@ -1,8 +1,11 @@
 import re, os, shutil, subprocess, tempfile
+from cfnlint import decode, core
 
 yamlfiles  = []
 keywords   = []
 
+# initialize the cfn-lint ruleset to be applied 
+rules = core.get_rules([], [], [], [], False, [])
 
 # load yaml keywords from keywords.txt
 def load_keywords():
@@ -45,6 +48,25 @@ def get_repo(giturl):
 
                     # scan the yaml file
                     check_yaml(fname, giturl)
+
+                    run_lint(fname)
+
+
+# run cfn-lint
+def run_lint(yamlfile):
+    template, matches = decode.decode(yamlfile, False)
+
+    # process all the rules 
+    matches = core.run_checks(
+        yamlfile,
+        template,
+        rules,
+        ["eu-west-1"]
+    )
+
+    print(yamlfile)
+    for x in matches:
+        print(x)
 
 
 # check the yaml file for serverless lines
