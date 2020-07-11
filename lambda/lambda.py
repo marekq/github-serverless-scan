@@ -16,7 +16,7 @@ def get_repo(giturl, gitpath):
 
         # clone the git repo 
         print("git clone " + giturl)
-        gitc = subprocess.Popen("git clone " + giturl + " " + tmppath + " --depth 2", shell = True)
+        gitc = subprocess.Popen("git clone " + giturl + " " + tmppath + " --depth 2", shell = True, stdout = subprocess.PIPE)
 
         # await for git command to complete
         gitc.communicate()
@@ -27,7 +27,7 @@ def get_repo(giturl, gitpath):
         # check content of yaml files
         for root, dirs, files in os.walk(tmppath, topdown = False):
             for name in files:
-                if re.search('template.yml', name) or re.search('template.yaml', name):
+                if re.search('.yml', name) or re.search('.yaml', name):
 
                     # create variable with file name
                     fname = os.path.join(root, name)
