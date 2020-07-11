@@ -1,6 +1,9 @@
 import re, os, shutil, subprocess, tempfile
 from cfnlint import decode, core
+from aws_xray_sdk.core import xray_recorder
+from aws_xray_sdk.core import patch_all
 
+patch_all()
 
 # initialize the cfn-lint ruleset to be applied 
 rules = core.get_rules([], [], ['I', 'E', 'W'], [], True, [])
@@ -30,13 +33,19 @@ def get_repo(giturl, gitpath):
                 if re.search('.yml', name) or re.search('.yaml', name):
 
                     # create variable with file name
-                    fname = os.path.join(root, name)
+                    fname   = os.path.join(root, name)
+                    f       = open(fname).read()
+                    pat     = re.compile("AWSTemplateFormatVersion", re.IGNORECASE)
 
-                    # store yaml files in list
-                    yamlfiles.append(fname)
+                    if pat.search(f) != None:
+                        # store yaml files in list
+                        yamlfiles.append(fname)
 
-                    # scan the yaml file
-                    run_lint(fname, gitpath, name)
+                        # scan the yaml file
+                        run_lint(fname, gitpath, name)
+
+                    else:
+                        print("skipping file " + gitpath + " " + fname)
                     
         total, used, free = shutil.disk_usage(tmppath)
         print(gitpath + " disk used - %d MB" % (used / (1024.0 ** 2)))

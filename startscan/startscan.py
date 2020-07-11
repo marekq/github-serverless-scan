@@ -1,4 +1,8 @@
 import boto3, json, math, requests, os
+from aws_xray_sdk.core import xray_recorder
+from aws_xray_sdk.core import patch_all
+
+patch_all()
 
 sqs         = boto3.client("sqs")
 sqsqueue    = os.environ["sqsqueue"] 
