@@ -38,9 +38,8 @@ def get_repo(giturl, gitpath):
                     # scan the yaml file
                     run_lint(fname, gitpath, name)
                     
-                    total, used, free = shutil.disk_usage("/tmp")
-                    print(gitpath + " disk used - %d MB" % (used / (1024.0 ** 2)))
-
+        total, used, free = shutil.disk_usage(tmppath)
+        print(gitpath + " disk used - %d MB" % (used / (1024.0 ** 2)))
 
     return yamlfiles
 
