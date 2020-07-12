@@ -28,8 +28,9 @@ def get_repo(giturl, gitpath):
         gitc.communicate()
 
         total, used, free = shutil.disk_usage(tmppath)
-        disk_free = str(used / (1024.0 ** 2))
+        disk_free = str(round(used / (1024.0 ** 2), 2))
         print(gitpath + " disk used - " + disk_free + " MB")
+        
         xray_recorder.current_subsegment().put_annotation('disk_usage', disk_free)
         xray_recorder.current_subsegment().put_annotation('gitrepo', giturl)
 
@@ -64,17 +65,17 @@ def get_repo(giturl, gitpath):
 def put_ddb(gitrepo, fname, check_id, check_full, check_line, disk_free):
     timest 		= int(time.time())
 
-ddb.put_item(TableName = os.environ['dynamo_table'], 
-    Item = {
-        'gitrepo'	    : gitrepo + "/" + fname + ":" + check_line,
-        'fname'         : fname,
-        'check_line'    : check_line,
-        'timest'        : timest,
-        'check_full'    : check_full,
-        'check_id'	    : check_id,
-        'disk_free'     : disk_free
-    }
-)
+    ddb.put_item(TableName = os.environ['dynamo_table'], 
+        Item = {
+            'gitrepo'	    : gitrepo + "/" + fname + ":" + check_line,
+            'fname'         : fname,
+            'check_line'    : check_line,
+            'timest'        : timest,
+            'check_full'    : check_full,
+            'check_id'	    : check_id,
+            'disk_free'     : disk_free
+        }
+    )
 
     print("wrote ddb record for " + gitrepo + " " + check_id)
 
