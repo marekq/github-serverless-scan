@@ -28,10 +28,10 @@ def get_repo(giturl, gitpath):
         gitc.communicate()
 
         total, used, free = shutil.disk_usage(tmppath)
-        disk_free = str(round(used / (1024.0 ** 2), 2))
-        print(gitpath + " disk used - " + disk_free + " MB")
-        
-        xray_recorder.current_subsegment().put_annotation('disk_usage', disk_free)
+        disk_used = str(round(used / (1024.0 ** 2), 2))
+        print(gitpath + " disk used - " + disk_used + " MB")
+
+        xray_recorder.current_subsegment().put_annotation('disk_usage', disk_used)
         xray_recorder.current_subsegment().put_annotation('gitrepo', giturl)
 
         # find yaml files
@@ -39,30 +39,33 @@ def get_repo(giturl, gitpath):
 
         # check content of yaml files
         for root, dirs, files in os.walk(tmppath, topdown = True):
-            for name in files:
-                if re.search('.yml', name) or re.search('.yaml', name):
+            for dirn in dirs:
+                for filen in files:
+                    if re.search('.yml', name) or re.search('.yaml', name):
 
-                    # create variable with file name
-                    fname   = os.path.join(root, name)
-                    f       = open(fname).read()
-                    pat     = re.compile("AWSTemplateFormatVersion", re.IGNORECASE)
+                        # create variable with file name
+                        gname   = os.path.join(dirn, filen)
+                        fname   = os.path.join(root, dirn, filen)
+                        f       = open(fname).read()
+                        pat     = re.compile("AWSTemplateFormatVersion", re.IGNORECASE)
 
-                    if pat.search(f) != None:
-                        # store yaml files in list
-                        yamlfiles.append(fname)
+                        if pat.search(f) != None:
+                            
+                            # store yaml files in list
+                            yamlfiles.append(fname)
 
-                        # scan the yaml file
-                        run_lint(fname, gitpath, name, giturl, disk_free)
+                            # scan the yaml file
+                            run_lint(fname, gitpath, gname, giturl, disk_used)
 
-                    else:
-                        print("skipping file " + gitpath + " " + fname)
+                        else:
+                            print("skipping file " + gitpath + " " + fname)
                      
     return yamlfiles
 
 
 # put ddb record
 @xray_recorder.capture("put_ddb")
-def put_ddb(gitrepo, fname, check_id, check_full, check_line, disk_free):
+def put_ddb(gitrepo, fname, check_id, check_full, check_line, disk_used):
     timest 		= int(time.time())
 
     ddb.put_item(TableName = os.environ['dynamo_table'], 
@@ -73,7 +76,7 @@ def put_ddb(gitrepo, fname, check_id, check_full, check_line, disk_free):
             'timest'        : timest,
             'check_full'    : check_full,
             'check_id'	    : check_id,
-            'disk_free'     : disk_free
+            'disk_used'     : disk_used
         }
     )
 
@@ -81,7 +84,7 @@ def put_ddb(gitrepo, fname, check_id, check_full, check_line, disk_free):
 
 # run cfn-lint
 @xray_recorder.capture("run_lint")
-def run_lint(yamlfile, gitpath, name, gitrepo, disk_free):
+def run_lint(yamlfile, gitpath, name, gitrepo, disk_used):
     template, matches = decode.decode(yamlfile, False)
     region = [os.environ['AWS_REGION']]
     count = 0
@@ -99,7 +102,7 @@ def run_lint(yamlfile, gitpath, name, gitrepo, disk_free):
             check_id    = str(check_full)[1:6]
             check_line  = str(check_full).split(":")[-1]
 
-            put_ddb(gitrepo, name, check_id, str(check_full), check_line, disk_free)
+            put_ddb(gitrepo, name, check_id, str(check_full), check_line, disk_used)
             count += 1
             
             print(gitrepo + "/" + name + ":" + check_line, name, str(check_full))

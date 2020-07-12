@@ -1,6 +1,6 @@
 AWSTemplateFormatVersion: '2010-09-09'
 Transform: 'AWS::Serverless-2016-10-31'
-Description: An AWS Serverless Specification template describing your function.
+Description: Scan GitHub repositories with cfn-lint and store the results in DynamoDB
 
 Parameters:
   githubrepo:
@@ -37,7 +37,7 @@ Resources:
       Handler: lambda.handler
       CodeUri: lambda/
       Tracing: Active
-      Description: 'Retrieve GitHub repositories, scan them  feeds and store them in DynamoDB'
+      Description: 'Scan Github repositories and store results in DynamoDB'
       Policies:
         - DynamoDBCrudPolicy:
             TableName: !Ref gittable
@@ -63,6 +63,7 @@ Resources:
       Handler: startscan.handler
       Runtime: python3.8
       Tracing: Active
+      Description: 'Get a list Github repositories and submit them to SQS'
       ReservedConcurrentExecutions: 1
       Layers:
         - !Ref gitpulllayer
