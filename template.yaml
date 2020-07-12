@@ -80,11 +80,11 @@ Resources:
       AttributeDefinitions:
       - AttributeName: gitrepo
         AttributeType: S
-      - AttributeName: file
+      - AttributeName: check_id
         AttributeType: S
       KeySchema:
       - AttributeName: gitrepo
         KeyType: HASH
-      - AttributeName: file
+      - AttributeName: check_id
         KeyType: RANGE  
       BillingMode: PAY_PER_REQUEST

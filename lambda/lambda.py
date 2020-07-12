@@ -72,7 +72,7 @@ def put_ddb(gitrepo, check_id, check_full):
 			'check_id'	    : check_id
 		})
 
-    print("wrote ddb record " + gitrepo + " " + file)
+    print("wrote ddb record for " + gitrepo + " " + check_id)
 
 # run cfn-lint
 @xray_recorder.capture("run_lint")
@@ -94,7 +94,7 @@ def run_lint(yamlfile, gitpath, name, gitrepo):
             check_id = str(check_full)[1:6]
 
             gitfull = gitrepo + "/" + name
-            put_ddb(gitfull, check_id, check_full)
+            put_ddb(gitfull, check_id, str(check_full))
             count += 1
             
             print(gitpath, name, str(check_full))
