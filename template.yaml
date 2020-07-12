@@ -50,7 +50,10 @@ Resources:
             Queue: !GetAtt sqsqueue.Arn
             BatchSize: 1
       ReservedConcurrentExecutions: 10
-
+      Environment: 
+        Variables:
+          dynamo_table: !Ref gittable
+        
   discoverrepo:
     Type: AWS::Serverless::Function
     Properties:
@@ -77,11 +80,11 @@ Resources:
       AttributeDefinitions:
       - AttributeName: gitrepo
         AttributeType: S
-      - AttributeName: timest
+      - AttributeName: file
         AttributeType: S
       KeySchema:
       - AttributeName: gitrepo
         KeyType: HASH
-      - AttributeName: timest
+      - AttributeName: file
         KeyType: RANGE  
       BillingMode: PAY_PER_REQUEST

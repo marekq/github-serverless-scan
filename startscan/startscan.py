@@ -10,18 +10,20 @@ githubrepo  = os.environ["githubrepo"]
 githuburl   = "https://api.github.com/users/" + githubrepo
 
 # send message to sqs
+@xray_recorder.capture("send_msg")
 def send_msg(x):
     sqs.send_message(QueueUrl = sqsqueue, MessageBody = x)
 
 
 # get repo count
+@xray_recorder.capture("get_repo")
 def get_repo():
     x       = requests.get(githuburl)
     z       = json.loads(x.text)
     pages   = math.ceil(z["public_repos"] / 100) + 1
     return pages
 
-
+@xray_recorder.capture("handler")
 def handler(event, context):
 
     # create results list
