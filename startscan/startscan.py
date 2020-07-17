@@ -58,3 +58,5 @@ def handler(event, context):
         send_msg(x + "," + str(srcuuid))
 
     print("sent " + str(len(res)) + " messages to sqs queue")
+
+    return srcuuid

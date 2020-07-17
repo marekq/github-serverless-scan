@@ -23,7 +23,7 @@ Resources:
       CompatibleRuntimes:
         - python3.8
       LicenseInfo: MIT
-      RetentionPolicy: Retain
+      RetentionPolicy: Delete
     Metadata:
       BuildMethod: python3.8
 
@@ -93,9 +93,7 @@ Resources:
       GlobalSecondaryIndexes:
       - IndexName: scanguid
         KeySchema:
-        - AttributeName: srcuuid
+        - AttributeName: uuid
           KeyType: HASH
-        - AttributeName: gitrepo
-          KeyType: RANGE
         Projection:
           ProjectionType: ALL
