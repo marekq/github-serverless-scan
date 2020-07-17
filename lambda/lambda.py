@@ -1,6 +1,7 @@
-import botocore, boto3, re, os, shutil, subprocess, tempfile, time
+import botocore, boto3, re, os, requests, shutil, subprocess, tempfile, time
 from cfnlint import decode, core
 from aws_xray_sdk.core import xray_recorder
+from zipfile import ZipFile
 from aws_xray_sdk.core import patch_all
 patch_all()
 
@@ -15,7 +16,7 @@ ddb = boto3.resource('dynamodb', region_name = os.environ['AWS_REGION'], config 
 
 # clone the given git repo to local disk, search for interesting yaml files
 @xray_recorder.capture("get_repo")
-def get_repo(giturl, gitpath):
+def get_repo(giturl, gitpath, srcuuid):
 
     yamlfiles   = []
 
@@ -23,11 +24,15 @@ def get_repo(giturl, gitpath):
     with tempfile.TemporaryDirectory() as tmppath:
 
         # clone the git repo 
-        print("git clone " + giturl)
-        gitc = subprocess.Popen("git clone --branch master " + giturl + " " + tmppath, shell = True, stdout = subprocess.PIPE)
+        print("git download " + giturl)
+        resp    = requests.get(giturl)
+        zname   = "master.zip"
+        zfile   = open(tmppath + "/" + zname, 'wb')
+        zfile.write(resp.content)
+        zfile.close()
 
-        # await for git command to complete
-        gitc.communicate()
+        with ZipFile(zname, 'r') as zipObj:
+            zipObj.extractall()
 
         total, used, free = shutil.disk_usage(tmppath)
         disk_used = str(round(used / (1024.0 ** 2), 2))
@@ -56,7 +61,7 @@ def get_repo(giturl, gitpath):
                             yamlfiles.append(lname)
 
                             # scan the yaml file
-                            run_lint(fname, gitpath, gname, giturl, disk_used, tmppath)
+                            run_lint(fname, gitpath, gname, giturl, disk_used, tmppath, srcuuid)
 
                         else:
                             print("skipping file " + gitpath + " " + lname)
@@ -66,7 +71,7 @@ def get_repo(giturl, gitpath):
 
 # put ddb record
 @xray_recorder.capture("put_ddb")
-def put_ddb(gitrepo, fname, check_id, check_full, check_line, disk_used, tmppath):
+def put_ddb(gitrepo, fname, check_id, check_full, check_line, disk_used, tmppath, srcuuid):
     timest 		= int(time.time())
 
     ddb.put_item(TableName = os.environ['dynamo_table'], 
@@ -78,7 +83,8 @@ def put_ddb(gitrepo, fname, check_id, check_full, check_line, disk_used, tmppath
             'timest'        : timest,
             'check_full'    : check_full,
             'check_id'	    : check_id,
-            'disk_used'     : disk_used
+            'disk_used'     : disk_used,
+            'src_uuid'      : srcuuid
         }
     )
 
@@ -87,7 +93,7 @@ def put_ddb(gitrepo, fname, check_id, check_full, check_line, disk_used, tmppath
 
 # run cfn-lint
 @xray_recorder.capture("run_lint")
-def run_lint(yamlfile, gitpath, name, gitrepo, disk_used, tmppath):
+def run_lint(yamlfile, gitpath, name, gitrepo, disk_used, tmppath, srcuuid):
     template, matches = decode.decode(yamlfile, False)
     region = [os.environ['AWS_REGION']]
     count = 0
@@ -105,7 +111,7 @@ def run_lint(yamlfile, gitpath, name, gitrepo, disk_used, tmppath):
             check_id    = str(check_full)[1:6]
             check_line  = str(check_full).split(":")[-1]
 
-            put_ddb(gitrepo, name, check_id, str(check_full), check_line, disk_used, tmppath)
+            put_ddb(gitrepo, name, check_id, str(check_full), check_line, disk_used, tmppath, srcuuid)
             count += 1
             
     except Exception as e:
@@ -119,12 +125,13 @@ def run_lint(yamlfile, gitpath, name, gitrepo, disk_used, tmppath):
 @xray_recorder.capture("handler")
 def handler(event, context):
 
-    eventurl   = event['Records'][0]['body']
-    gitbase    = eventurl[:19]
-    gitpath    = eventurl[19:]
+    sqsmsg              = event['Records'][0]['body']
+    eventurl, srcuuid   = sqsmsg.split(',')
+    gitbase             = eventurl[:19]
+    gitpath             = eventurl[19:]
 
     # get the git repo
-    yamlfiles  = get_repo(eventurl, gitpath)
+    yamlfiles           = get_repo(eventurl, gitpath, srcuuid)
 
     # return matched yaml files
     print(yamlfiles)

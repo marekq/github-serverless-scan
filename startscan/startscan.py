@@ -1,4 +1,4 @@
-import boto3, json, math, requests, os
+import boto3, json, math, requests, os, uuid
 from aws_xray_sdk.core import xray_recorder
 from aws_xray_sdk.core import patch_all
 
@@ -33,6 +33,7 @@ def handler(event, context):
 
     # open file for writing
     f       = open("/tmp/out.csv", "w")
+    srcuuid = uuid.uuid4().hex
 
     # get all repos
     for x in range(int(pages)):
@@ -43,7 +44,7 @@ def handler(event, context):
 
         # add repo url to results and file
         for a in y:
-            curl = a["clone_url"]
+            curl = str(a["html_url"]) + "/archive/master.zip"
             if curl not in res:
                 res.append(curl)
                 print("sending " + curl)
@@ -54,6 +55,6 @@ def handler(event, context):
     print("results in /tmp/out.csv")
 
     for x in res:
-        send_msg(x)
+        send_msg(x + "," + str(srcuuid))
 
     print("sent " + str(len(res)) + " messages to sqs queue")

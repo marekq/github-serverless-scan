@@ -31,7 +31,6 @@ Resources:
     Type: AWS::Serverless::Function
     Properties:
       Layers:
-        - !Sub arn:aws:lambda:${AWS::Region}:553035198032:layer:git-lambda2:6
         - !Ref gitpulllayer
       Runtime: python3.8
       Handler: lambda.handler
@@ -83,9 +82,20 @@ Resources:
         AttributeType: S
       - AttributeName: check_id
         AttributeType: S
+      - AttributeName: srcuuid
+        AttributeType: S
       KeySchema:
       - AttributeName: gitrepo
         KeyType: HASH
       - AttributeName: check_id
         KeyType: RANGE  
       BillingMode: PAY_PER_REQUEST
+      GlobalSecondaryIndexes:
+      - IndexName: scanguid
+        KeySchema:
+        - AttributeName: srcuuid
+          KeyType: HASH
+        - AttributeName: gitrepo
+          KeyType: RANGE
+        Projection:
+          ProjectionType: ALL
