@@ -21,18 +21,19 @@ def get_repo(giturl, gitpath, srcuuid):
     yamlfiles   = []
 
     # create a temporary directory on /tmp to clone the repo
-    with tempfile.TemporaryDirectory() as tmppath:
+    with tempfile.TemporaryDirectory(dir = "/tmp") as tmppath:
 
         # clone the git repo 
-        print("git download " + giturl)
+        print("git http download " + giturl)
         resp    = requests.get(giturl)
-        zname   = "master.zip"
-        zfile   = open(tmppath + "/" + zname, 'wb')
+        zname   = tmppath + "/master.zip"
+
+        zfile   = open(zname, 'wb')
         zfile.write(resp.content)
         zfile.close()
 
         with ZipFile(zname, 'r') as zipObj:
-            zipObj.extractall()
+            zipObj.extractall(path = tempfile)
 
         total, used, free = shutil.disk_usage(tmppath)
         disk_used = str(round(used / (1024.0 ** 2), 2))
