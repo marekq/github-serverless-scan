@@ -19,7 +19,7 @@ Resources:
     Properties:
       LayerName: gitlayer
       Description: create a layer with gitpull tools
-      ContentUri: layer/.
+      ContentUri: lambda-layer/.
       CompatibleRuntimes:
         - python3.8
       LicenseInfo: MIT
@@ -33,8 +33,8 @@ Resources:
       Layers:
         - !Ref gitpulllayer
       Runtime: python3.8
-      Handler: lambda.handler
-      CodeUri: lambda/
+      Handler: lint-lambda.handler
+      CodeUri: lint-lambda/
       Tracing: Active
       Description: 'Scan Github repositories and store results in DynamoDB'
       Policies:
@@ -58,8 +58,8 @@ Resources:
     Properties:
       MemorySize: 256
       Timeout: 30
-      CodeUri: startscan/
-      Handler: startscan.handler
+      CodeUri: scan-lambda/
+      Handler: scan-lambda.handler
       Runtime: python3.8
       Tracing: Active
       Description: 'Get a list Github repositories and submit them to SQS'
@@ -82,7 +82,7 @@ Resources:
         AttributeType: S
       - AttributeName: check_id
         AttributeType: S
-      - AttributeName: srcuuid
+      - AttributeName: scan_uuid
         AttributeType: S
       KeySchema:
       - AttributeName: gitrepo
@@ -93,7 +93,7 @@ Resources:
       GlobalSecondaryIndexes:
       - IndexName: scanguid
         KeySchema:
-        - AttributeName: uuid
+        - AttributeName: scan_uuid
           KeyType: HASH
         Projection:
           ProjectionType: ALL

@@ -1,4 +1,4 @@
-import botocore, boto3, re, os, requests, shutil, subprocess, tempfile, time
+import boto3, re, os, requests, shutil, tempfile, time
 from cfnlint import decode, core
 from aws_xray_sdk.core import xray_recorder
 from zipfile import ZipFile
@@ -11,7 +11,7 @@ rules = core.get_rules([], [], ['I', 'E', 'W'], [], True, [])
 
 
 # connect to dynamodb
-ddb = boto3.resource('dynamodb', region_name = os.environ['AWS_REGION'], config = botocore.client.Config(max_pool_connections = 25)).Table(os.environ['dynamo_table'])
+ddb = boto3.resource('dynamodb', region_name = os.environ['AWS_REGION']).Table(os.environ['dynamo_table'])
 
 
 # clone the given git repo to local disk, search for interesting yaml files
@@ -84,7 +84,7 @@ def put_ddb(gitrepo, fname, check_id, check_full, check_line, lname, disk_used, 
         'check_full'    : check_full,
         'check_id'	    : check_id,
         'disk_used'     : disk_used,
-        'uuid'          : srcuuid
+        'scan_uuid'     : srcuuid
     }
 
     ddb.put_item(
