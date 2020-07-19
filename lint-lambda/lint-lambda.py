@@ -77,7 +77,7 @@ def get_repo(giturl, gitpath, srcuuid):
 
                             # scan the yaml file and check for keywords
                             run_lint(fname, gitpath, gname, giturl, lname, disk_used, tmppath, srcuuid)
-                            check_yaml(fname, keywords)
+                            check_yaml(fname, gitpath, gname, giturl, lname, disk_used, tmppath, srcuuid, keywords)
 
                         else:
                             print("skipping file " + lname)
@@ -110,11 +110,17 @@ def put_ddb(gitrepo, fname, check_id, check_full, check_line, lname, disk_used, 
 
 # check the yaml file for serverless lines
 @xray_recorder.capture("check_yaml")
-def check_yaml(yamlfile, keywords):
-    for line in open(yamlfile):
+def check_yaml(fname, gitrepo, gname, giturl, lname, disk_used, tmppath, srcuuid, keywords):
+    linec = 0
+
+    for line in open(fname):
+        linec += 1
+
         for keyw in keywords:
             if re.search(keyw, line):
-                print('@@@', keyw.strip(), yamlfile.strip())
+                kw = keyw.strip()
+                print('@@@', str(linec), kw, fname)
+                put_ddb(gitrepo, fname, kw, '.', str(linec), lname, disk_used, tmppath, srcuuid)
 
 
 # run cfn-lint
