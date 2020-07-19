@@ -119,7 +119,6 @@ def check_yaml(fname, gitrepo, gname, giturl, lname, disk_used, tmppath, srcuuid
         for keyw in keywords:
             if re.search(keyw, line):
                 kw = keyw.strip()
-                print('@@@', str(linec), kw, fname)
                 put_ddb(gitrepo, fname, kw, '.', str(linec), lname, disk_used, tmppath, srcuuid)
 
 
