@@ -1,3 +1,4 @@
+AMIDescribePolicy
 AWS::ACMPCA::Certificate
 AWS::ACMPCA::CertificateAuthorityActivation
 AWS::AccessAnalyzer::Analyzer
@@ -253,6 +254,7 @@ AWS::SecretsManager::Secret
 AWS::SecretsManager::SecretTargetAttachment
 AWS::SecurityHub::Hub
 AWS::Serverless
+AWS::Serverless-2016-10-31
 AWS::Serverless::Api
 AWS::Serverless::Application
 AWS::Serverless::Function
@@ -268,7 +270,59 @@ AWS::WAFRegional::ByteMatchSet
 AWS::WAFRegional::GeoMatchSet
 AWS::WAFRegional::RateBasedRule
 AWS::WAFRegional::RegexPatternSet
+AWSSecretsManagerGetSecretValuePolicy
+AWSSecretsManagerRotationPolicy
 AWSTemplateFormatVersion
+AthenaQueryPolicy
+CloudFormationDescribeStacksPolicy
+CloudWatchDashboardPolicy
+CloudWatchDescribeAlarmHistoryPolicy
+CloudWatchPutMetricPolicy
+CodeCommitCrudPolicy
+CodeCommitReadPolicy
+CodePipelineLambdaExecutionPolicy
+CodePipelineReadOnlyPolicy
+ComprehendBasicAccessPolicy
+CostExplorerReadOnlyPolicy
+DynamoDBBackupFullAccessPolicy
+DynamoDBCrudPolicy
+DynamoDBReadPolicy
+DynamoDBReconfigurePolicy
+DynamoDBRestoreFromBackupPolicy
+DynamoDBStreamReadPolicy
+DynamoDBWritePolicy
+EC2CopyImagePolicy
+EC2DescribePolicy
+EFSWriteAccessPolicy
+EKSDescribePolicy
+EcsRunTaskPolicy
+ElasticMapReduceAddJobFlowStepsPolicy
+ElasticMapReduceCancelStepsPolicy
+ElasticMapReduceModifyInstanceFleetPolicy
+ElasticMapReduceModifyInstanceGroupsPolicy
+ElasticMapReduceSetTerminationProtectionPolicy
+ElasticMapReduceTerminateJobFlowsPolicy
+ElasticsearchHttpPostPolicy
+EventBridgePutEventsPolicy
+FilterLogEventsPolicy
+FirehoseCrudPolicy
+FirehoseWritePolicy
+KMSDecryptPolicy
+KMSEncryptPolicy
+KinesisCrudPolicy
+KinesisStreamReadPolicy
+LambdaInvokePolicy
+MobileAnalyticsWriteOnlyAccessPolicy
+OrganizationsListAccountsPolicy
+PinpointEndpointAccessPolicy
+PollyFullAccessPolicy
+RekognitionDetectOnlyPolicy
+RekognitionFacesManagementPolicy
+RekognitionFacesPolicy
+RekognitionLabelsPolicy
+RekognitionNoDataAccessPolicy
+RekognitionReadPolicy
+RekognitionWriteOnlyAccessPolicy
 ReservedConcurrentExecutions
 Runtime: go1.x
 Runtime: java11
@@ -282,3 +336,24 @@ Runtime: python3.7
 Runtime: python3.8
 Runtime: ruby2.6
 Runtime: ruby2.7
+S3CrudPolicy
+S3FullAccessPolicy
+S3ReadPolicy
+S3WritePolicy
+SESBulkTemplatedCrudPolicy
+SESCrudPolicy
+SESEmailTemplateCrudPolicy
+SESSendBouncePolicy
+SNSCrudPolicy
+SNSPublishMessagePolicy
+SQSPollerPolicy
+SQSSendMessagePolicy
+SSMParameterReadPolicy
+SageMakerCreateEndpointConfigPolicy
+SageMakerCreateEndpointPolicy
+ServerlessRepoReadWriteAccessPolicy
+StepFunctionsExecutionPolicy
+TextractDetectAnalyzePolicy
+TextractGetResultPolicy
+TextractPolicy
+VPCAccessPolicy
