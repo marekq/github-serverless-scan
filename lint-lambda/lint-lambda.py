@@ -10,6 +10,19 @@ patch_all()
 rules = core.get_rules([], [], ['I', 'E', 'W'], [], True, [])
 
 
+# load yaml keywords from keywords.txt
+@xray_recorder.capture("load_keywords")
+def load_keywords():
+    kw 	= []
+    f 	= 'keywords.txt'
+
+	# open the feeds file and read line by line
+    for line in open(f):
+        kw.append(line)
+
+    return kw
+
+
 # connect to dynamodb
 ddb = boto3.resource('dynamodb', region_name = os.environ['AWS_REGION']).Table(os.environ['dynamo_table'])
 
@@ -19,6 +32,7 @@ ddb = boto3.resource('dynamodb', region_name = os.environ['AWS_REGION']).Table(o
 def get_repo(giturl, gitpath, srcuuid):
 
     yamlfiles   = []
+    keywords    = load_keywords()
 
     # create a temporary directory on /tmp to clone the repo
     with tempfile.TemporaryDirectory(dir = "/tmp") as tmppath:
@@ -61,8 +75,9 @@ def get_repo(giturl, gitpath, srcuuid):
                             # store yaml files in list
                             yamlfiles.append(lname)
 
-                            # scan the yaml file
+                            # scan the yaml file and check for keywords
                             run_lint(fname, gitpath, gname, giturl, lname, disk_used, tmppath, srcuuid)
+                            check_yaml(fname, keywords)
 
                         else:
                             print("skipping file " + lname)
@@ -92,8 +107,14 @@ def put_ddb(gitrepo, fname, check_id, check_full, check_line, lname, disk_used, 
         Item = ddbitem
     )
 
-    print("wrote ddb record")
-    print(ddbitem)
+
+# check the yaml file for serverless lines
+@xray_recorder.capture("check_yaml")
+def check_yaml(yamlfile, keywords):
+    for line in open(yamlfile):
+        for keyw in keywords:
+            if re.search(keyw, line):
+                print('@@@', keyw.strip(), yamlfile.strip())
 
 
 # run cfn-lint
