@@ -60,7 +60,7 @@ def get_repo(giturl, gitpath, srcuuid):
         for root, dirs, files in os.walk(tmppath, topdown = True):
             for dirn in dirs:
                 for filen in files:
-                    if re.search('.yml', filen) or re.search('.yaml', filen):
+                    if re.search('.yml', filen) or re.search('.yaml', filen) or re.search('.json', filen):
 
                         # create variable with file name
                         fname   = os.path.join(root, filen)
