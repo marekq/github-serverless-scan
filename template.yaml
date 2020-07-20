@@ -18,7 +18,7 @@ Resources:
     Type: AWS::Serverless::LayerVersion
     Properties:
       LayerName: gitlayer
-      Description: create a layer with gitpull tools
+      Description: Create a layer with gitpull tools
       ContentUri: lambda-layer/.
       CompatibleRuntimes:
         - python3.8
@@ -36,7 +36,7 @@ Resources:
       Handler: lint-lambda.handler
       CodeUri: lint-lambda/
       Tracing: Active
-      Description: 'Scan Github repositories and store results in DynamoDB'
+      Description: Scan Github repositories and store results in DynamoDB
       Policies:
         - DynamoDBCrudPolicy:
             TableName: !Ref gittable
@@ -62,7 +62,7 @@ Resources:
       Handler: scan-lambda.handler
       Runtime: python3.8
       Tracing: Active
-      Description: 'Get a list Github repositories and submit them to SQS'
+      Description: Get a list Github repositories and submit them to SQS
       ReservedConcurrentExecutions: 1
       Layers:
         - !Ref gitpulllayer
