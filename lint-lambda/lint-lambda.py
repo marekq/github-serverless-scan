@@ -38,7 +38,7 @@ def get_repo(giturl, gitpath, srcuuid):
     with tempfile.TemporaryDirectory(dir = "/tmp") as tmppath:
 
         # clone the git repo 
-        print("git http download " + giturl[:-19])
+        print("git http download " + giturl)
         resp    = requests.get(giturl)
         zname   = tmppath + "/master.zip"
 

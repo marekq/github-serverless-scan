@@ -40,7 +40,7 @@ Resources:
       Policies:
         - DynamoDBCrudPolicy:
             TableName: !Ref gittable
-      MemorySize: 512
+      MemorySize: 1024
       Timeout: 30
       Events:
         sqstrigger:
