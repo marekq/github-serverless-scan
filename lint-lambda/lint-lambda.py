@@ -172,9 +172,9 @@ def run_lint(yamlfile, gitpath, name, gitrepo, lname, disk_used, tmppath, srcuui
 @xray_recorder.capture("handler")
 def handler(event, context):
 
-    sqsmsg = event['Records'][0]['body']
-    print('received sqsmsg '+(str(sqsmsg))
-    
+    sqsmsg = str(event['Records'][0]['body'])
+    print('received sqsmsg ' + sqsmsg)
+
     reponame, branch, srcuuid = sqsmsg.split(',')
     giturl = 'https://github.com/' + reponame + "/archive/" + branch + ".zip"
 
