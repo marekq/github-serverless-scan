@@ -1,4 +1,4 @@
-import boto3, re, os, requests, shutil, tempfile, time
+import boto3, re, os, pprint, requests, shutil, tempfile, time
 from cfnlint import decode, core
 from aws_xray_sdk.core import xray_recorder
 from zipfile import ZipFile
@@ -73,43 +73,59 @@ def get_repo(giturl, gitpath, srcuuid):
         for root, dirs, files in os.walk(tmppath, topdown = True):
             for dirn in dirs:
                 for filen in files:
-                    if re.search('.yml', filen) or re.search('.yaml', filen) or re.search('.json', filen) or re.search('.template'):
+
+                    count = 0
+
+                    if re.search('.yml', filen) or re.search('.yaml', filen) or re.search('.json', filen) or re.search('.template', filen):
 
                         # create variable with file name
-                        fname = os.path.join(root, filen)
-                        lname = fname.replace(tmppath, '')
-                        gname = giturl + lname
+                        cfnfile = os.path.join(root, filen)
+                        filename = '/'.join(cfnfile.split('/')[4:])
 
-                        f = open(fname).read()
+                        f = open(cfnfile).read()
 
                         # Detect whether the file is likely a CloudFormation file based on the "Resources" field. 
                         # The "AWSTemplateFormatVersion" field would be a better candidate, but only the "Resources" field is formally required; https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/template-anatomy.html
                         pat = re.compile("Resources:", re.IGNORECASE)
 
+                        # if pattern is found
                         if pat.search(f) != None:
                             
                             # store yaml files in list
-                            cfnfiles.append(lname)
+                            cfnfiles.append(filename)
 
                             # scan the yaml file and check for keywords
-                            run_lint(fname, gitpath, gname, giturl, lname, disk_used, tmppath, srcuuid)
-                            check_yaml(fname, gitpath, gname, giturl, lname, disk_used, tmppath, srcuuid, keywords)
+                            count += run_lint(cfnfile, gitpath, giturl, filename, disk_used, tmppath, srcuuid)
+                            count += check_yaml(cfnfile, gitpath, giturl, filename, disk_used, tmppath, srcuuid, keywords)
 
                         else:
-                            print("skipping file " + lname)
+                            # print error message
+                            print("skipping file " + filename)
+
+                    # print found messages count if more than 0
+                    if count != 0:
+                        print("found " + str(count) + " matches in " + cfnfile)
                      
     return cfnfiles
 
 
 # put ddb record
 @xray_recorder.capture("put_ddb")
-def put_ddb(gitrepo, fname, check_id, check_full, check_line, lname, disk_used, tmppath, srcuuid):
-    timest 		= int(time.time())
+def put_ddb(gitrepo, gitpath, check_id, check_full, check_line, filename, disk_used, tmppath, srcuuid):
 
-    ddbitem     = {
-        'gitrepo' : gitrepo + "/" + lname + ":" + check_line,
-        'file_url' : gitrepo[:-18] + "blob/master" + lname + "#L" + check_line,
-        'file_name' : fname,
+    # get current time
+    timest = int(time.time())
+
+    # get gitprofile and gitrepo
+    gitprofile, gitrepo = gitpath.split('/')
+
+    # construct the dynamodb record
+    ddbitem = {
+        'gitfile' : gitpath + "/" + filename + ":" + check_line,
+        'gitprofile' : gitprofile,
+        'gitrepo' : gitrepo,
+        'file_url' : "https://github.com/" + gitpath + "/blob/master/" + filename + "#L" + check_line,
+        'file_name' : filename,
         'check_line' : check_line,
         'timest': timest,
         'check_full': check_full,
@@ -118,6 +134,11 @@ def put_ddb(gitrepo, fname, check_id, check_full, check_line, lname, disk_used, 
         'scan_uuid': srcuuid
     }
 
+    # pretty print results
+    pp = pprint.PrettyPrinter(indent = 2)
+    pp.pprint(ddbitem)
+
+    # put the item into dynamodb
     ddb.put_item(
         TableName = os.environ['dynamo_table'], 
         Item = ddbitem
@@ -126,29 +147,34 @@ def put_ddb(gitrepo, fname, check_id, check_full, check_line, lname, disk_used, 
 
 # check the yaml file for serverless lines
 @xray_recorder.capture("check_yaml")
-def check_yaml(fname, gitrepo, gname, giturl, lname, disk_used, tmppath, srcuuid, keywords):
+def check_yaml(cfnfile, gitpath, gitrepo, lname, disk_used, tmppath, srcuuid, keywords):
     linec = 0
+    count = 0
 
-    for line in open(fname):
+    # check
+    for line in open(cfnfile):
         linec += 1
 
         for keyw in keywords:
             if re.search(keyw, line):
                 kw = keyw.strip()
-                put_ddb(gitrepo, fname, kw, '.', str(linec), lname, disk_used, tmppath, srcuuid)
+                put_ddb(gitrepo, gitpath, kw, '.', str(linec), lname, disk_used, tmppath, srcuuid)
+                count += 1
+
+    return count
 
 
 # run cfn-lint
 @xray_recorder.capture("run_lint")
-def run_lint(yamlfile, gitpath, name, gitrepo, lname, disk_used, tmppath, srcuuid):
-    template, matches = decode.decode(yamlfile, False)
+def run_lint(cfnfile, gitpath, gitrepo, filename, disk_used, tmppath, srcuuid):
+    template, matches = decode.decode(cfnfile, False)
     region = [os.environ['AWS_REGION']]
     count = 0
 
     # process all the rules 
     try:
         matches = core.run_checks(
-            yamlfile,
+            cfnfile,
             template,
             rules,
             region
@@ -158,14 +184,14 @@ def run_lint(yamlfile, gitpath, name, gitrepo, lname, disk_used, tmppath, srcuui
             check_id = str(check_full)[1:6]
             check_line = str(check_full).split(":")[-1]
 
-            put_ddb(gitrepo, name, check_id, str(check_full), check_line, lname, disk_used, tmppath, srcuuid)
+            put_ddb(gitrepo, gitpath, check_id, str(check_full), check_line, filename, disk_used, tmppath, srcuuid)
             count += 1
             
     except Exception as e:
-        print('error reading ' + gitpath + " " + name)
+        print('error reading ' + gitpath + " " + filename)
         print(e)
 
-    print("found " + str(count) + " checks in " + gitpath[:-19] + lname)
+    return count
 
 
 # lambda handler

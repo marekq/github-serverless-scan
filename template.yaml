@@ -13,6 +13,7 @@ Resources:
     Type: AWS::SQS::Queue
     Properties:
       VisibilityTimeout: 60
+      MessageRetentionPeriod: 300
 
   lambdalayer:
     Type: AWS::Serverless::LayerVersion
