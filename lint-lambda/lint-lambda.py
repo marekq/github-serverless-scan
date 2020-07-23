@@ -31,49 +31,65 @@ ddb = boto3.resource('dynamodb', region_name = os.environ['AWS_REGION']).Table(o
 @xray_recorder.capture("get_repo")
 def get_repo(giturl, gitpath, srcuuid):
 
-    yamlfiles   = []
-    keywords    = load_keywords()
+    cfnfiles = []
+    keywords = load_keywords()
 
     # create a temporary directory on /tmp to clone the repo
     with tempfile.TemporaryDirectory(dir = "/tmp") as tmppath:
 
         # clone the git repo 
         print("git http download " + giturl)
-        resp    = requests.get(giturl)
-        zname   = tmppath + "/master.zip"
+        resp = requests.get(giturl)
+        zname = tmppath + "/master.zip"
 
-        zfile   = open(zname, 'wb')
+        zfile = open(zname, 'wb')
         zfile.write(resp.content)
         zfile.close()
 
-        with ZipFile(zname, 'r') as zipObj:
-            zipObj.extractall(path = tmppath)
+        zipfiles = []
 
+        # extract only .yml, .yaml, .json or .template files from zip
+        with ZipFile(zname, 'r') as zipObj:
+            zlist = zipObj.namelist()
+
+            for zfile in zlist:
+                if zfile.endswith('.yml') or zfile.endswith('.yaml') or zfile.endswith('.json') or zfile.endswith('.template'):
+                    zipfiles.append(zfile)
+
+            zipObj.extractall(path = tmppath, members = zipfiles)
+
+        # check local /tmp disk used
         total, used, free = shutil.disk_usage(tmppath)
         disk_used = str(round(used / (1024.0 ** 2), 2))
         print(gitpath + " disk used - " + disk_used + " MB")
 
+        # delete the zip file from /tmp
+        os.remove(zname)
+
         xray_recorder.current_subsegment().put_annotation('disk_usage', disk_used)
         xray_recorder.current_subsegment().put_annotation('gitrepo', giturl)
 
-        # check content of yaml files
+        # check content of cloudformation files
         for root, dirs, files in os.walk(tmppath, topdown = True):
             for dirn in dirs:
                 for filen in files:
-                    if re.search('.yml', filen) or re.search('.yaml', filen) or re.search('.json', filen):
+                    if re.search('.yml', filen) or re.search('.yaml', filen) or re.search('.json', filen) or re.search('.template'):
 
                         # create variable with file name
-                        fname   = os.path.join(root, filen)
-                        lname   = fname.replace(tmppath, '')
-                        gname   = giturl + lname
+                        fname = os.path.join(root, filen)
+                        lname = fname.replace(tmppath, '')
+                        gname = giturl + lname
 
-                        f       = open(fname).read()
-                        pat     = re.compile("AWSTemplateFormatVersion", re.IGNORECASE)
+                        f = open(fname).read()
+
+                        # Detect whether the file is likely a CloudFormation file based on the "Resources" field. 
+                        # The "AWSTemplateFormatVersion" field would be a better candidate, but only the "Resources" field is formally required; https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/template-anatomy.html
+                        pat = re.compile("Resources:", re.IGNORECASE)
 
                         if pat.search(f) != None:
                             
                             # store yaml files in list
-                            yamlfiles.append(lname)
+                            cfnfiles.append(lname)
 
                             # scan the yaml file and check for keywords
                             run_lint(fname, gitpath, gname, giturl, lname, disk_used, tmppath, srcuuid)
@@ -82,7 +98,7 @@ def get_repo(giturl, gitpath, srcuuid):
                         else:
                             print("skipping file " + lname)
                      
-    return yamlfiles
+    return cfnfiles
 
 
 # put ddb record
@@ -91,15 +107,15 @@ def put_ddb(gitrepo, fname, check_id, check_full, check_line, lname, disk_used, 
     timest 		= int(time.time())
 
     ddbitem     = {
-        'gitrepo'	    : gitrepo + "/" + lname + ":" + check_line,
-        'file_url'      : gitrepo[:-18] + "/blob/master" + lname + "#L" + check_line,
-        'file_name'     : fname,
-        'check_line'    : check_line,
-        'timest'        : timest,
-        'check_full'    : check_full,
-        'check_id'	    : check_id,
-        'disk_used'     : disk_used,
-        'scan_uuid'     : srcuuid
+        'gitrepo' : gitrepo + "/" + lname + ":" + check_line,
+        'file_url' : gitrepo[:-18] + "blob/master" + lname + "#L" + check_line,
+        'file_name' : fname,
+        'check_line' : check_line,
+        'timest': timest,
+        'check_full': check_full,
+        'check_id': check_id,
+        'disk_used': disk_used,
+        'scan_uuid': srcuuid
     }
 
     ddb.put_item(
@@ -139,8 +155,8 @@ def run_lint(yamlfile, gitpath, name, gitrepo, lname, disk_used, tmppath, srcuui
         )
     
         for check_full in matches:
-            check_id    = str(check_full)[1:6]
-            check_line  = str(check_full).split(":")[-1]
+            check_id = str(check_full)[1:6]
+            check_line = str(check_full).split(":")[-1]
 
             put_ddb(gitrepo, name, check_id, str(check_full), check_line, lname, disk_used, tmppath, srcuuid)
             count += 1
@@ -156,16 +172,15 @@ def run_lint(yamlfile, gitpath, name, gitrepo, lname, disk_used, tmppath, srcuui
 @xray_recorder.capture("handler")
 def handler(event, context):
 
-    sqsmsg              = event['Records'][0]['body']
-    eventurl, srcuuid   = sqsmsg.split(',')
-    gitbase             = eventurl[:19]
-    gitpath             = eventurl[19:]
+    sqsmsg = event['Records'][0]['body']
+    reponame, branch, srcuuid = sqsmsg.split(',')
+    giturl = 'https://github.com/' + reponame + "/archive/" + branch + ".zip")
 
     # get the git repo
-    yamlfiles           = get_repo(eventurl, gitpath, srcuuid)
+    cfnfiles = get_repo(giturl, reponame, srcuuid)
 
     # return matched yaml files
-    print(yamlfiles)
+    print(cfnfiles)
     print("ddbscan uuid " + str(srcuuid))
 
     return srcuuid

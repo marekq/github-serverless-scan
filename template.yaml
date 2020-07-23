@@ -3,7 +3,7 @@ Transform: 'AWS::Serverless-2016-10-31'
 Description: Scan GitHub repositories with cfn-lint and store the results in DynamoDB
 
 Parameters:
-  githubrepo:
+  githubuser:
     Type: String
     Description: The GitHub profile to scan (i.e. 'marekq' for https://github.com/marekq)
     Default: marekq
@@ -14,7 +14,7 @@ Resources:
     Properties:
       VisibilityTimeout: 60
 
-  gitpulllayer:
+  lambdalayer:
     Type: AWS::Serverless::LayerVersion
     Properties:
       LayerName: gitlayer
@@ -31,7 +31,7 @@ Resources:
     Type: AWS::Serverless::Function
     Properties:
       Layers:
-        - !Ref gitpulllayer
+        - !Ref lambdalayer
       Runtime: python3.8
       Handler: lint-lambda.handler
       CodeUri: lint-lambda/
@@ -65,11 +65,11 @@ Resources:
       Description: Get a list Github repositories and submit them to SQS
       ReservedConcurrentExecutions: 1
       Layers:
-        - !Ref gitpulllayer
+        - !Ref lambdalayer
       Environment:
         Variables:
           sqsqueue: !Ref sqsqueue
-          githubrepo: !Ref githubrepo
+          githubuser: !Ref githubuser
       Policies:
         - SQSSendMessagePolicy:
             QueueName: !GetAtt sqsqueue.QueueName

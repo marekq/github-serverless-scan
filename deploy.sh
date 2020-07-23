@@ -8,11 +8,11 @@ NC='\033[0m'
 sam build -u
 
 # validate the sam stack
-echo -e "\n${RED} * Running SAM validate locally to test function... ${NC}\n"
+echo -e "\n${RED} * running sam validate and cfn-lint locally to test cloudformation template... ${NC}\n"
 sam validate
 
 # deploy the sam stack to the aws region
-echo -e "\n${RED} * Deploying the SAM stack to AWS... ${NC}\n"
+echo -e "\n${RED} * deploying the SAM stack to aws... ${NC}\n"
 
 # check if samconfig.toml file is present
 if [ ! -f samconfig.toml ]; then
