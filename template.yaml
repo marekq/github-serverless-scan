@@ -9,11 +9,6 @@ Parameters:
     Default: marekq
 
 Resources:
-  sqsqueue:
-    Type: AWS::SQS::Queue
-    Properties:
-      VisibilityTimeout: 60
-      MessageRetentionPeriod: 300
 
   lambdalayer:
     Type: AWS::Serverless::LayerVersion
@@ -43,13 +38,6 @@ Resources:
             TableName: !Ref gittable
       MemorySize: 1024
       Timeout: 30
-      Events:
-        sqstrigger:
-          Type: SQS
-          Properties:
-            Queue: !GetAtt sqsqueue.Arn
-            BatchSize: 1
-      ReservedConcurrentExecutions: 10
       Environment: 
         Variables:
           dynamo_table: !Ref gittable
@@ -63,17 +51,13 @@ Resources:
       Handler: scan-lambda.handler
       Runtime: python3.8
       Tracing: Active
-      Description: Get a list Github repositories and submit them to SQS
+      Description: Get a list Github repositories
       ReservedConcurrentExecutions: 1
       Layers:
         - !Ref lambdalayer
       Environment:
         Variables:
-          sqsqueue: !Ref sqsqueue
           githubuser: !Ref githubuser
-      Policies:
-        - SQSSendMessagePolicy:
-            QueueName: !GetAtt sqsqueue.QueueName
 
   gittable:
     Type: AWS::DynamoDB::Table
@@ -99,6 +83,9 @@ Resources:
         Projection:
           ProjectionType: ALL
 
+  steplogs:
+    Type: AWS::Logs::LogGroup
+
   gitstatemachine:
     Type: AWS::Serverless::StateMachine 
     Properties:
@@ -111,3 +98,11 @@ Resources:
             FunctionName: !Ref discoverrepo
         - LambdaInvokePolicy:
             FunctionName: !Ref gitpull
+        - CloudWatchFullAccess
+      Type: STANDARD
+      Logging:
+        Level: ALL
+        IncludeExecutionData: True
+        Destinations:
+          - CloudWatchLogsLogGroup:
+              LogGroupArn: !GetAtt steplogs.Arn

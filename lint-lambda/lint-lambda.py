@@ -26,9 +26,6 @@ def load_keywords():
 
     return kw
 
-# load cfnfile keywords    
-keywords = load_keywords()
-
 
 # connect to dynamodb
 ddb = boto3.resource('dynamodb', region_name = os.environ['AWS_REGION']).Table(os.environ['dynamo_table'])
@@ -36,7 +33,7 @@ ddb = boto3.resource('dynamodb', region_name = os.environ['AWS_REGION']).Table(o
 
 # clone the given git repo to local disk, search for interesting cfnfiles
 @xray_recorder.capture("get_repo")
-def get_repo(giturl, gitpath, srcuuid):
+def get_repo(giturl, gitpath, srcuuid, keywords):
 
     cfnfiles = []
 
@@ -227,14 +224,18 @@ def run_lint(cfnfile, gitpath, gitrepo, filename, disk_used, tmppath, srcuuid):
 @xray_recorder.capture("handler")
 def handler(event, context):
 
-    sqsmsg = str(event['Records'][0]['body'])
-    print('*** received sqsmsg ' + sqsmsg)
+    # retrieve step function message
+    msg = str(event['message'])
+    print('*** received step function message ' + msg)
 
-    reponame, branch, srcuuid = sqsmsg.split(',')
+    # load cfnfile keywords    
+    keywords = load_keywords()
+
+    reponame, branch, srcuuid = msg.split(',')
     giturl = 'https://github.com/' + reponame + "/archive/" + branch + ".zip"
 
     # get the git repo
-    cfnfiles = get_repo(giturl, reponame, srcuuid)
+    cfnfiles = get_repo(giturl, reponame, srcuuid, keywords)
 
     # return matched yaml files
     print(cfnfiles)
