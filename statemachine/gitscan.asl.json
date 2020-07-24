@@ -1,0 +1,45 @@
+{
+    "Comment": "An example of the Amazon States Language for reading messages from an SQS queue and iteratively processing each message.",
+    "StartAt": "Run GitHub Discovery",
+    "States": {
+      "Run GitHub Discovery": {
+        "Type": "Task",
+        "Resource": "arn:aws:states:::lambda:invoke",
+        "OutputPath": "$.Payload",
+        "Parameters": {
+          "FunctionName": "${gitscanlambda}"
+        },
+        "Next": "Process Scan Results"
+      },
+      "Process Scan Results": {
+        "Type": "Map",
+        "Next": "Finish",
+        "ItemsPath": "$",
+        "Parameters": {
+          "MessageNumber.$": "$$.Map.Item.Index",
+          "MessageDetails.$": "$$.Map.Item.Value"
+        },
+        "Iterator": {
+          "StartAt": "Run GitHub Scan",
+          "States": {
+            "Run GitHub Scan": {
+              "Type": "Task",
+              "Resource": "arn:aws:states:::lambda:invoke",
+              "InputPath": "$.MessageDetails",
+              "ResultPath": null,
+              "Parameters": {
+                "FunctionName": "${gitpulllambda}",
+                "Payload": {
+                  "ReceiptHandle.$": "$.ReceiptHandle"
+                }
+              },
+              "End": true
+            }
+          }
+        }
+      },
+      "Finish": {
+        "Type": "Succeed"
+      }
+    }
+  }

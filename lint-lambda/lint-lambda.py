@@ -1,13 +1,16 @@
-import boto3, re, os, pprint, requests, shutil, tempfile, time
+import boto3, re, os, requests, shutil, tempfile, time
 from cfnlint import decode, core
 from aws_xray_sdk.core import xray_recorder
 from zipfile import ZipFile
 from aws_xray_sdk.core import patch_all
+
 patch_all()
 
 
-# initialize the cfn-lint ruleset to be applied and retrieve aws region where the lambda runs
+# initialize the cfn-lint ruleset to be applied
 rules = core.get_rules([], [], ['I', 'E', 'W'], [], True, [])
+
+# retrieve aws region where the lambda runs
 region = [os.environ['AWS_REGION']]
 
 
@@ -23,6 +26,9 @@ def load_keywords():
 
     return kw
 
+# load cfnfile keywords    
+keywords = load_keywords()
+
 
 # connect to dynamodb
 ddb = boto3.resource('dynamodb', region_name = os.environ['AWS_REGION']).Table(os.environ['dynamo_table'])
@@ -33,7 +39,6 @@ ddb = boto3.resource('dynamodb', region_name = os.environ['AWS_REGION']).Table(o
 def get_repo(giturl, gitpath, srcuuid):
 
     cfnfiles = []
-    keywords = load_keywords()
 
     # create a temporary directory on /tmp to clone the repo
     with tempfile.TemporaryDirectory(dir = "/tmp") as tmppath:
@@ -97,6 +102,7 @@ def get_repo(giturl, gitpath, srcuuid):
                         # if pattern is found
                         if pat.search(f) != None:
 
+                            print("??? getting file " + giturl + " " + gitpath + " " + filename)
                             # store cfnfiles in list
                             cfnfiles.append(filename)
                             validfile = True
@@ -120,7 +126,7 @@ def get_repo(giturl, gitpath, srcuuid):
 
 # put ddb record
 @xray_recorder.capture("put_ddb")
-def put_ddb(gitrepo, gitpath, check_id, check_full, check_line, filename, disk_used, tmppath, srcuuid):
+def put_ddb(gitrepo, gitpath, check_id, check_full, check_line_id, check_line_str, filename, disk_used, tmppath, srcuuid):
 
     # get current time
     timest = int(time.time())
@@ -130,22 +136,19 @@ def put_ddb(gitrepo, gitpath, check_id, check_full, check_line, filename, disk_u
 
     # construct the dynamodb record
     ddbitem = {
-        'gitfile' : gitpath + "/" + filename + ":" + check_line,
+        'gitfile' : gitpath + "/" + filename + ":" + check_line_id,
         'gitprofile' : gitprofile,
         'gitrepo' : gitrepo,
-        'file_url' : "https://github.com/" + gitpath + "/blob/master/" + filename + "#L" + check_line,
+        'file_url' : "https://github.com/" + gitpath + "/blob/master/" + filename + "#L" + check_line_id,
         'file_name' : filename,
-        'check_line' : check_line,
+        'check_line_id' : check_line_id,
+        'check_line_full' : check_line_str, 
         'timest': timest,
-        'check_full': check_full,
+        'check_text': check_full,
         'check_id': check_id,
         'disk_used': disk_used,
         'scan_uuid': srcuuid
     }
-
-    # pretty print results
-    #pp = pprint.PrettyPrinter(indent = 2)
-    #pp.pprint(ddbitem)
 
     # put the item into dynamodb
     ddb.put_item(
@@ -156,7 +159,7 @@ def put_ddb(gitrepo, gitpath, check_id, check_full, check_line, filename, disk_u
 
 # check the yaml file for serverless lines
 @xray_recorder.capture("check_cfnfile")
-def check_cfnfile(cfnfile, gitpath, gitrepo, lname, disk_used, tmppath, srcuuid, keywords):
+def check_cfnfile(cfnfile, gitpath, gitrepo, filename, disk_used, tmppath, srcuuid, keywords):
     linec = 0
     count = 0
 
@@ -172,14 +175,14 @@ def check_cfnfile(cfnfile, gitpath, gitrepo, lname, disk_used, tmppath, srcuuid,
                 kw = keyw.strip()
 
                 # put a dynamodb record for the found keyword
-                put_ddb(gitrepo, gitpath, kw, '.', str(linec), lname, disk_used, tmppath, srcuuid)
+                put_ddb(gitrepo, gitpath, kw, '.', str(linec), line, filename, disk_used, tmppath, srcuuid)
 
                 # increase count by 1
                 count += 1
 
         # if the string contains an s3 code uri, try to retrieve the s3 artifact
-        if re.search('CodeUri: s3://', line):
-            print('$$$' + line)
+        if re.search("CodeUri: s3://", line):
+            print("$$$ " + line.strip() + " " + gitrepo + " " + gitpath)
 
     # return the found count of checks
     return count
@@ -191,6 +194,10 @@ def run_lint(cfnfile, gitpath, gitrepo, filename, disk_used, tmppath, srcuuid):
 
     # load the cfnfile
     template, matches = decode.decode(cfnfile, False)
+
+    with open(cfnfile) as f:
+        cfncontent = f.readlines()
+
     count = 0
 
     # process all the rules 
@@ -204,9 +211,10 @@ def run_lint(cfnfile, gitpath, gitrepo, filename, disk_used, tmppath, srcuuid):
     
         for check_full in matches:
             check_id = str(check_full)[1:6]
-            check_line = str(check_full).split(":")[-1]
+            check_line_id = str(check_full).split(":")[-1]
+            check_line_str = str(cfncontent[int(check_line_id)])
 
-            put_ddb(gitrepo, gitpath, check_id, str(check_full), check_line, filename, disk_used, tmppath, srcuuid)
+            put_ddb(gitrepo, gitpath, check_id, str(check_full), check_line_id, check_line_str, filename, disk_used, tmppath, srcuuid)
             count += 1
             
     except Exception as e:
@@ -220,7 +228,7 @@ def run_lint(cfnfile, gitpath, gitrepo, filename, disk_used, tmppath, srcuuid):
 def handler(event, context):
 
     sqsmsg = str(event['Records'][0]['body'])
-    print('***  received sqsmsg ' + sqsmsg)
+    print('*** received sqsmsg ' + sqsmsg)
 
     reponame, branch, srcuuid = sqsmsg.split(',')
     giturl = 'https://github.com/' + reponame + "/archive/" + branch + ".zip"

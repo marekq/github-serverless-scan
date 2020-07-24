@@ -1,3 +1,4 @@
-aws-xray-sdk==2.6.0
-cfn-lint==0.34.0
-requests==2.24.0
+aws-xray-sdk
+cfn-lint
+requests
+pygithub

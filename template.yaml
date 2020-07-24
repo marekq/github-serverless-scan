@@ -35,7 +35,7 @@ Resources:
         - !Ref lambdalayer
       Runtime: python3.8
       Handler: lint-lambda.handler
-      CodeUri: lint-lambda/
+      CodeUri: ./lint-lambda
       Tracing: Active
       Description: Scan Github repositories and store results in DynamoDB
       Policies:
@@ -59,7 +59,7 @@ Resources:
     Properties:
       MemorySize: 256
       Timeout: 30
-      CodeUri: scan-lambda/
+      CodeUri: ./scan-lambda
       Handler: scan-lambda.handler
       Runtime: python3.8
       Tracing: Active
@@ -98,3 +98,16 @@ Resources:
           KeyType: HASH
         Projection:
           ProjectionType: ALL
+
+  gitstatemachine:
+    Type: AWS::Serverless::StateMachine 
+    Properties:
+      DefinitionUri: statemachine/gitscan.asl.json
+      DefinitionSubstitutions:
+        gitscanlambda: !GetAtt discoverrepo.Arn
+        gitpulllambda: !GetAtt gitpull.Arn
+      Policies: 
+        - LambdaInvokePolicy:
+            FunctionName: !Ref discoverrepo
+        - LambdaInvokePolicy:
+            FunctionName: !Ref gitpull
