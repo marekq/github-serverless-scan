@@ -55,4 +55,4 @@ def handler(event, context):
 
     # print end message and return scan uuid
     print("sent " + str(len(res)) + " messages to sqs queue")
-    return srcuuid
+    return res
