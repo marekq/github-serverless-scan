@@ -6,11 +6,12 @@ from aws_xray_sdk.core import patch_all
 patch_all()
 
 
-# initialize the cfn-lint ruleset to be applied 
+# initialize the cfn-lint ruleset to be applied and retrieve aws region where the lambda runs
 rules = core.get_rules([], [], ['I', 'E', 'W'], [], True, [])
+region = [os.environ['AWS_REGION']]
 
 
-# load yaml keywords from keywords.txt
+# load cfnfile keywords from keywords.txt
 @xray_recorder.capture("load_keywords")
 def load_keywords():
     kw 	= []
@@ -27,7 +28,7 @@ def load_keywords():
 ddb = boto3.resource('dynamodb', region_name = os.environ['AWS_REGION']).Table(os.environ['dynamo_table'])
 
 
-# clone the given git repo to local disk, search for interesting yaml files
+# clone the given git repo to local disk, search for interesting cfnfiles
 @xray_recorder.capture("get_repo")
 def get_repo(giturl, gitpath, srcuuid):
 
@@ -42,20 +43,23 @@ def get_repo(giturl, gitpath, srcuuid):
         resp = requests.get(giturl)
         zname = tmppath + "/master.zip"
 
+        # write zip file to temp disk
         zfile = open(zname, 'wb')
         zfile.write(resp.content)
         zfile.close()
 
         zipfiles = []
 
-        # extract only .yml, .yaml, .json or .template files from zip
+        # iterate of the zipfile content
         with ZipFile(zname, 'r') as zipObj:
             zlist = zipObj.namelist()
 
+            # extract only .yml, .yaml, .json or .template files from zip file listing
             for zfile in zlist:
                 if zfile.endswith('.yml') or zfile.endswith('.yaml') or zfile.endswith('.json') or zfile.endswith('.template'):
                     zipfiles.append(zfile)
 
+            # extract all cfnfiles
             zipObj.extractall(path = tmppath, members = zipfiles)
 
         # check local /tmp disk used
@@ -74,7 +78,9 @@ def get_repo(giturl, gitpath, srcuuid):
             for dirn in dirs:
                 for filen in files:
 
+                    # create counter and validfile boolean
                     count = 0
+                    validfile = False
 
                     if re.search('.yml', filen) or re.search('.yaml', filen) or re.search('.json', filen) or re.search('.template', filen):
 
@@ -90,22 +96,25 @@ def get_repo(giturl, gitpath, srcuuid):
 
                         # if pattern is found
                         if pat.search(f) != None:
-                            
-                            # store yaml files in list
-                            cfnfiles.append(filename)
 
-                            # scan the yaml file and check for keywords
+                            # store cfnfiles in list
+                            cfnfiles.append(filename)
+                            validfile = True
+
+                            # scan the cfnfile and check for keywords, add the output count 
                             count += run_lint(cfnfile, gitpath, giturl, filename, disk_used, tmppath, srcuuid)
-                            count += check_yaml(cfnfile, gitpath, giturl, filename, disk_used, tmppath, srcuuid, keywords)
+                            count += check_cfnfile(cfnfile, gitpath, giturl, filename, disk_used, tmppath, srcuuid, keywords)
 
                         else:
-                            # print error message
-                            print("skipping file " + filename)
 
-                    # print found messages count if more than 0
-                    if count != 0:
-                        print("found " + str(count) + " matches in " + cfnfile)
+                            print("### skipping file " + filename)
+
+                    # print found messages count if validfile
+                    if validfile:
+
+                        print("&&& found " + str(count) + " matches in " + cfnfile)
                      
+    # return discovered cfnfiles
     return cfnfiles
 
 
@@ -135,8 +144,8 @@ def put_ddb(gitrepo, gitpath, check_id, check_full, check_line, filename, disk_u
     }
 
     # pretty print results
-    pp = pprint.PrettyPrinter(indent = 2)
-    pp.pprint(ddbitem)
+    #pp = pprint.PrettyPrinter(indent = 2)
+    #pp.pprint(ddbitem)
 
     # put the item into dynamodb
     ddb.put_item(
@@ -146,29 +155,42 @@ def put_ddb(gitrepo, gitpath, check_id, check_full, check_line, filename, disk_u
 
 
 # check the yaml file for serverless lines
-@xray_recorder.capture("check_yaml")
-def check_yaml(cfnfile, gitpath, gitrepo, lname, disk_used, tmppath, srcuuid, keywords):
+@xray_recorder.capture("check_cfnfile")
+def check_cfnfile(cfnfile, gitpath, gitrepo, lname, disk_used, tmppath, srcuuid, keywords):
     linec = 0
     count = 0
 
-    # check
+    # check the cfnfile for keywords
     for line in open(cfnfile):
+
         linec += 1
 
         for keyw in keywords:
+
+            # check if the keyword exists in line
             if re.search(keyw, line):
                 kw = keyw.strip()
+
+                # put a dynamodb record for the found keyword
                 put_ddb(gitrepo, gitpath, kw, '.', str(linec), lname, disk_used, tmppath, srcuuid)
+
+                # increase count by 1
                 count += 1
 
+        # if the string contains an s3 code uri, try to retrieve the s3 artifact
+        if re.search('CodeUri: s3://', line):
+            print('$$$' + line)
+
+    # return the found count of checks
     return count
 
 
 # run cfn-lint
 @xray_recorder.capture("run_lint")
 def run_lint(cfnfile, gitpath, gitrepo, filename, disk_used, tmppath, srcuuid):
+
+    # load the cfnfile
     template, matches = decode.decode(cfnfile, False)
-    region = [os.environ['AWS_REGION']]
     count = 0
 
     # process all the rules 
@@ -188,8 +210,7 @@ def run_lint(cfnfile, gitpath, gitrepo, filename, disk_used, tmppath, srcuuid):
             count += 1
             
     except Exception as e:
-        print('error reading ' + gitpath + " " + filename)
-        print(e)
+        print('!!! error reading ' + gitpath + " " + filename + " " + str(e))
 
     return count
 
@@ -199,7 +220,7 @@ def run_lint(cfnfile, gitpath, gitrepo, filename, disk_used, tmppath, srcuuid):
 def handler(event, context):
 
     sqsmsg = str(event['Records'][0]['body'])
-    print('received sqsmsg ' + sqsmsg)
+    print('***  received sqsmsg ' + sqsmsg)
 
     reponame, branch, srcuuid = sqsmsg.split(',')
     giturl = 'https://github.com/' + reponame + "/archive/" + branch + ".zip"
@@ -209,6 +230,6 @@ def handler(event, context):
 
     # return matched yaml files
     print(cfnfiles)
-    print("ddbscan uuid " + str(srcuuid))
+    print("^^^ ddbscan uuid " + str(srcuuid))
 
     return srcuuid

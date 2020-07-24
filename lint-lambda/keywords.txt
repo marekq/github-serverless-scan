@@ -282,6 +282,7 @@ CodeCommitCrudPolicy
 CodeCommitReadPolicy
 CodePipelineLambdaExecutionPolicy
 CodePipelineReadOnlyPolicy
+CodeUri
 ComprehendBasicAccessPolicy
 CostExplorerReadOnlyPolicy
 DynamoDBBackupFullAccessPolicy

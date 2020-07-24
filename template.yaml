@@ -79,14 +79,14 @@ Resources:
     Type: AWS::DynamoDB::Table
     Properties:
       AttributeDefinitions:
-      - AttributeName: gitrepo
+      - AttributeName: gitfile
         AttributeType: S
       - AttributeName: check_id
         AttributeType: S
       - AttributeName: scan_uuid
         AttributeType: S
       KeySchema:
-      - AttributeName: gitrepo
+      - AttributeName: gitfile
         KeyType: HASH
       - AttributeName: check_id
         KeyType: RANGE  
