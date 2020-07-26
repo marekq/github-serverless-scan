@@ -13,10 +13,9 @@
       },
       "Process Scan Results": {
         "Type": "Map",
-        "Next": "Finish",
+        "Next": "Create Report",
         "ItemsPath": "$",
         "Parameters": {
-          "MessageNumber.$": "$$.Map.Item.Index",
           "MessageDetails.$": "$$.Map.Item.Value"
         },
         "Iterator": {
@@ -25,6 +24,7 @@
             "Run GitHub Scan": {
               "Type": "Task",
               "Resource": "arn:aws:states:::lambda:invoke",
+              "OutputPath": "$.ScanUUID",
               "Parameters": {
                 "FunctionName": "${gitpulllambda}",
                 "Payload":{  
@@ -35,6 +35,15 @@
             }
           }
         }
+      },
+      "Create Report": {
+        "Type": "Task",
+        "Resource": "arn:aws:states:::lambda:invoke",
+        "InputPath": "$.ScanUUID",
+        "Parameters": {
+          "FunctionName": "${genreportlambda}"
+        },
+        "Next": "Finish"
       },
       "Finish": {
         "Type": "Succeed"

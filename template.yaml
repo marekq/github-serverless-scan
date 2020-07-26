@@ -23,6 +23,9 @@ Resources:
     Metadata:
       BuildMethod: python3.8
 
+  resultbucket:
+    Type: AWS::S3::Bucket
+
   gitpull:
     Type: AWS::Serverless::Function
     Properties:
@@ -59,6 +62,22 @@ Resources:
         Variables:
           githubuser: !Ref githubuser
 
+  genreport:
+    Type: AWS::Serverless::Function
+    Properties:
+      Layers:
+        - !Ref lambdalayer
+      Runtime: python3.8
+      Handler: report-lambda.handler
+      CodeUri: ./report-lambda
+      Tracing: Active
+      Description: Store scan results from DynamoDB
+      MemorySize: 1024
+      Timeout: 30
+      Environment: 
+        Variables:
+          dynamo_table: !Ref gittable
+
   gittable:
     Type: AWS::DynamoDB::Table
     Properties:
@@ -93,11 +112,14 @@ Resources:
       DefinitionSubstitutions:
         gitscanlambda: !GetAtt discoverrepo.Arn
         gitpulllambda: !GetAtt gitpull.Arn
+        genreportlambda: !GetAtt genreport.Arn
       Policies: 
         - LambdaInvokePolicy:
             FunctionName: !Ref discoverrepo
         - LambdaInvokePolicy:
             FunctionName: !Ref gitpull
+        - LambdaInvokePolicy:
+            FunctionName: !Ref genreport
         - CloudWatchFullAccess
       Type: STANDARD
       Logging:
@@ -106,3 +128,8 @@ Resources:
         Destinations:
           - CloudWatchLogsLogGroup:
               LogGroupArn: !GetAtt steplogs.Arn
+
+Outputs:
+  StateMachineURL:
+    #Value: !Ref gitstatemachine
+    Value: !Sub 'https://${AWS::Region}.console.aws.amazon.com/states/home?region=${AWS::Region}#/statemachines/view/${gitstatemachine}'

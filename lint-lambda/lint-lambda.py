@@ -241,4 +241,4 @@ def handler(event, context):
     print(cfnfiles)
     print("^^^ ddbscan uuid " + str(srcuuid))
 
-    return srcuuid
+    return {'ScanUUID': srcuuid}
