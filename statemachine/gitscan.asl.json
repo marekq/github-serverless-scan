@@ -24,7 +24,7 @@
             "Run GitHub Scan": {
               "Type": "Task",
               "Resource": "arn:aws:states:::lambda:invoke",
-              "OutputPath": "$.ScanUUID",
+              "OutputPath": "$.Payload.ScanUUID",
               "Parameters": {
                 "FunctionName": "${gitpulllambda}",
                 "Payload":{  
@@ -39,14 +39,17 @@
       "Create Report": {
         "Type": "Task",
         "Resource": "arn:aws:states:::lambda:invoke",
-        "InputPath": "$.ScanUUID",
+        "InputPath": "$",
+        "OutputPath": "$",
         "Parameters": {
           "FunctionName": "${genreportlambda}"
         },
         "Next": "Finish"
       },
       "Finish": {
-        "Type": "Succeed"
+        "Type": "Succeed",
+        "InputPath": "$",
+        "OutputPath": "$"
       }
     }
   }

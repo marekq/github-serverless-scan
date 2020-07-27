@@ -77,6 +77,9 @@ Resources:
       Environment: 
         Variables:
           dynamo_table: !Ref gittable
+      Policies:
+        - DynamoDBCrudPolicy:
+            TableName: !Ref gittable        
 
   gittable:
     Type: AWS::DynamoDB::Table
@@ -131,5 +134,4 @@ Resources:
 
 Outputs:
   StateMachineURL:
-    #Value: !Ref gitstatemachine
     Value: !Sub 'https://${AWS::Region}.console.aws.amazon.com/states/home?region=${AWS::Region}#/statemachines/view/${gitstatemachine}'
