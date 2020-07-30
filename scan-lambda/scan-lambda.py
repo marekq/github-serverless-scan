@@ -1,18 +1,20 @@
 from github import Github
-import boto3, os, requests, uuid
+import os, uuid
 
 from aws_xray_sdk.core import xray_recorder
 from aws_xray_sdk.core import patch_all
 
 patch_all()
 
-
+# get github user account to scan
 githubuser = os.environ["githubuser"]
 
 
 # lambda handler
 @xray_recorder.capture("handler")
 def handler(event, context):
+
+    print(event)
 
     # create results list
     res = []

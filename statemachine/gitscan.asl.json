@@ -5,9 +5,13 @@
       "Run GitHub Discovery": {
         "Type": "Task",
         "Resource": "arn:aws:states:::lambda:invoke",
+        "InputPath": "$.GithubRepo",
         "OutputPath": "$.Payload",
         "Parameters": {
-          "FunctionName": "${gitscanlambda}"
+          "FunctionName": "${gitscanlambda}",
+          "Payload": {  
+            "GithubRepo.$": "$.GithubRepo"
+         }
         },
         "Next": "Process Scan Results"
       },
@@ -24,10 +28,10 @@
             "Run GitHub Scan": {
               "Type": "Task",
               "Resource": "arn:aws:states:::lambda:invoke",
-              "OutputPath": "$.Payload.ScanUUID",
+              "ResultPath": null,
               "Parameters": {
                 "FunctionName": "${gitpulllambda}",
-                "Payload":{  
+                "Payload": {  
                   "message.$": "$.MessageDetails"
                }
               },
@@ -39,8 +43,8 @@
       "Create Report": {
         "Type": "Task",
         "Resource": "arn:aws:states:::lambda:invoke",
-        "InputPath": "$",
         "OutputPath": "$",
+        "InputPath": "$",
         "Parameters": {
           "FunctionName": "${genreportlambda}"
         },
