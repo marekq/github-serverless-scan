@@ -87,9 +87,13 @@ Resources:
       Environment: 
         Variables:
           dynamo_table: !Ref gittable
+          s3_bucket: !Ref resultbucket
       Policies:
         - DynamoDBCrudPolicy:
-            TableName: !Ref gittable        
+            TableName: !Ref gittable  
+        - S3WritePolicy:
+            BucketName: !Ref resultbucket
+
 
   gittable:
     Type: AWS::DynamoDB::Table

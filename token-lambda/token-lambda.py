@@ -1,9 +1,9 @@
-import uuid
+import time
 
 def handler(event, context):
         
     # generate scan uuid
-    srcuuid = uuid.uuid4().hex
+    srcuuid = str(hex(int(time.time())))
 
     return {
         'GithubRepo' : event['GithubRepo'], 

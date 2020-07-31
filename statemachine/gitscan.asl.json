@@ -64,6 +64,14 @@
                     "Type": "Task",
                     "Resource": "arn:aws:states:::lambda:invoke",
                     "OutputPath": null,
+                    "Retry": [
+                      {
+                        "ErrorEquals": [ "States.ALL" ],
+                        "IntervalSeconds": 1,
+                        "BackoffRate": 2,
+                        "MaxAttempts": 3
+                      }
+                    ],
                     "Parameters": {
                       "FunctionName": "${gitpulllambda}",
                       "Payload": {  
