@@ -19,7 +19,7 @@ def handler(event, context):
     # create results list
     res = []
 
-    # open file for writing
+    # generate scan uuid
     srcuuid = uuid.uuid4().hex
 
     # get all repos
@@ -33,16 +33,6 @@ def handler(event, context):
 
             res.append(msg)
             print("sending " + msg)
-
-    # write to file and print result path
-    f = open("/tmp/out.csv", "w")
-
-    for x in res:
-        f.write(x+"\n")
-
-    f.close()
-
-    print("results in /tmp/out.csv")
 
     # print end message and return cfnfiles to step function
     print("returning " + str(len(res)) + " repos")

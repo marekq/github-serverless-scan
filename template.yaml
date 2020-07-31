@@ -62,6 +62,16 @@ Resources:
         Variables:
           githubuser: !Ref githubuser
 
+  tokenlambda:
+    Type: AWS::Serverless::Function
+    Properties:
+      Runtime: python3.8
+      CodeUri: ./token-lambda
+      Tracing: Active
+      Handler: token-lambda.handler
+      MemorySize: 128
+      Timeout: 3
+
   genreport:
     Type: AWS::Serverless::Function
     Properties:
@@ -116,6 +126,7 @@ Resources:
         gitscanlambda: !GetAtt discoverrepo.Arn
         gitpulllambda: !GetAtt gitpull.Arn
         genreportlambda: !GetAtt genreport.Arn
+        tokenlambda: !GetAtt tokenlambda.Arn
       Policies: 
         - LambdaInvokePolicy:
             FunctionName: !Ref discoverrepo
@@ -123,6 +134,8 @@ Resources:
             FunctionName: !Ref gitpull
         - LambdaInvokePolicy:
             FunctionName: !Ref genreport
+        - LambdaInvokePolicy:
+            FunctionName: !Ref tokenlambda
         - CloudWatchFullAccess
       Type: STANDARD
       Logging:

@@ -1,59 +1,97 @@
 {
-    "Comment": "Scan the GitHub repositories of a user using Lambda",
-    "StartAt": "Run GitHub Discovery",
-    "States": {
-      "Run GitHub Discovery": {
-        "Type": "Task",
-        "Resource": "arn:aws:states:::lambda:invoke",
-        "InputPath": "$.GithubRepo",
-        "OutputPath": "$.Payload",
-        "Parameters": {
-          "FunctionName": "${gitscanlambda}",
-          "Payload": {  
-            "GithubRepo.$": "$.GithubRepo"
-         }
-        },
-        "Next": "Process Scan Results"
+  "Comment": "Scan the GitHub repositories of a user using Lambda",
+  "StartAt": "Generate Scan ID",
+  "States": {
+    "Generate Scan ID": {
+      "Type": "Task",
+      "Resource": "arn:aws:states:::lambda:invoke",
+      "OutputPath": "$.Payload",
+      "Parameters": {
+        "FunctionName": "${tokenlambda}",
+        "Payload": {  
+          "GithubRepo.$": "$.GithubRepo"
+       }
       },
-      "Process Scan Results": {
-        "Type": "Map",
-        "Next": "Create Report",
-        "ItemsPath": "$",
-        "Parameters": {
-          "MessageDetails.$": "$$.Map.Item.Value"
-        },
-        "Iterator": {
-          "StartAt": "Run GitHub Scan",
-          "States": {
-            "Run GitHub Scan": {
-              "Type": "Task",
-              "Resource": "arn:aws:states:::lambda:invoke",
-              "ResultPath": null,
-              "Parameters": {
-                "FunctionName": "${gitpulllambda}",
-                "Payload": {  
-                  "message.$": "$.MessageDetails"
-               }
-              },
+      "Next": "ParallelState"
+    },
+    "ParallelState": {
+      "Type":"Parallel",
+      "InputPath":"$",
+      "OutputPath":"$",
+      "Next":"Create Report",
+      "Comment":"This is a parallel state",
+      "Branches": [
+        {
+          "StartAt":"Pass Scan ID",
+          "States":{
+            "Pass Scan ID": {
+              "Type": "Pass",
+              "InputPath":"$.ScanID",
+              "OutputPath":"$",
+              "Comment":"Succeed state",
               "End": true
             }
           }
-        }
-      },
-      "Create Report": {
-        "Type": "Task",
-        "Resource": "arn:aws:states:::lambda:invoke",
-        "OutputPath": "$",
-        "InputPath": "$",
-        "Parameters": {
-          "FunctionName": "${genreportlambda}"
         },
-        "Next": "Finish"
+        {
+          "StartAt": "Run GitHub Discovery",
+          "States": {
+            "Run GitHub Discovery": {
+              "Type": "Task",
+              "Resource": "arn:aws:states:::lambda:invoke",
+              "ResultPath": "$",
+              "Parameters": {
+                "FunctionName": "${gitscanlambda}",
+                "Payload": {  
+                  "GithubRepo.$": "$.GithubRepo"
+               }
+              },
+              "Next": "Process Scan Results"
+            },
+            "Process Scan Results": {
+              "Type": "Map",
+              "End": true,
+              "ItemsPath": "$.Payload",
+              "OutputPath": null,
+              "Parameters": {
+                "MessageDetails.$": "$$.Map.Item.Value"
+              },
+              "Iterator": {
+                "StartAt": "Run GitHub Scan",
+                "States": {
+                  "Run GitHub Scan": {
+                    "Type": "Task",
+                    "Resource": "arn:aws:states:::lambda:invoke",
+                    "OutputPath": null,
+                    "Parameters": {
+                      "FunctionName": "${gitpulllambda}",
+                      "Payload": {  
+                        "message.$": "$.MessageDetails"
+                     }
+                    },
+                    "End": true
+                  }
+                }
+              }
+            }
+          }
+        }
+      ]
+    },
+    "Create Report": {
+      "Type": "Task",
+      "Resource": "arn:aws:states:::lambda:invoke",
+      "OutputPath": "$",
+      "InputPath": "$",
+      "Parameters": {
+        "FunctionName": "${genreportlambda}"
       },
-      "Finish": {
-        "Type": "Succeed",
-        "InputPath": "$",
-        "OutputPath": "$"
-      }
+      "Next": "Finish"
+    },
+    "Finish": {
+      "Type": "Succeed",
+      "InputPath": "$",
+      "OutputPath": "$"
     }
   }
+}
