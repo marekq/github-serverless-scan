@@ -26,7 +26,7 @@
           "States":{
             "Pass Scan ID": {
               "Type": "Pass",
-              "InputPath":"$.ScanID",
+              "InputPath":"$",
               "OutputPath":"$",
               "Comment":"Succeed state",
               "End": true
@@ -43,7 +43,8 @@
               "Parameters": {
                 "FunctionName": "${gitscanlambda}",
                 "Payload": {  
-                  "GithubRepo.$": "$.GithubRepo"
+                  "GithubRepo.$": "$.GithubRepo",
+                  "ScanID.$": "$.ScanID"
                }
               },
               "Next": "Process Scan Results"
@@ -81,10 +82,13 @@
     "Create Report": {
       "Type": "Task",
       "Resource": "arn:aws:states:::lambda:invoke",
-      "OutputPath": "$",
+      "OutputPath": "$.Payload",
       "InputPath": "$",
       "Parameters": {
-        "FunctionName": "${genreportlambda}"
+        "FunctionName": "${genreportlambda}",
+        "Payload": {  
+          "Data.$": "$"
+        }
       },
       "Next": "Finish"
     },
