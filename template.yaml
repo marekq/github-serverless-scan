@@ -2,12 +2,6 @@ AWSTemplateFormatVersion: '2010-09-09'
 Transform: 'AWS::Serverless-2016-10-31'
 Description: Scan GitHub repositories with cfn-lint and store the results in DynamoDB
 
-Parameters:
-  githubuser:
-    Type: String
-    Description: The GitHub profile to scan (i.e. 'marekq' for https://github.com/marekq)
-    Default: marekq
-
 Resources:
 
   lambdalayer:
@@ -58,9 +52,6 @@ Resources:
       ReservedConcurrentExecutions: 1
       Layers:
         - !Ref lambdalayer
-      Environment:
-        Variables:
-          githubuser: !Ref githubuser
 
   tokenlambda:
     Type: AWS::Serverless::Function
@@ -82,7 +73,7 @@ Resources:
       CodeUri: ./report-lambda
       Tracing: Active
       Description: Store scan results from DynamoDB
-      MemorySize: 1024
+      MemorySize: 128
       Timeout: 30
       Environment: 
         Variables:
@@ -119,7 +110,7 @@ Resources:
         Projection:
           ProjectionType: ALL
 
-  steplogs:
+  scanlogs:
     Type: AWS::Logs::LogGroup
 
   gitstatemachine:
@@ -147,7 +138,7 @@ Resources:
         IncludeExecutionData: True
         Destinations:
           - CloudWatchLogsLogGroup:
-              LogGroupArn: !GetAtt steplogs.Arn
+              LogGroupArn: !GetAtt scanlogs.Arn
 
 Outputs:
   StateMachineURL:

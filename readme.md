@@ -1,7 +1,7 @@
 github-serverless-scan
 ======================
 
-Scan your GitHub repositories with CloudFormation or AWS SAM code with cfn-lint. The stack deploys two Lambda functions, a Step Function and a DynamoDB table as shown below. You can invoke the scan using the Step Function which is provisioned. After a scan, you can review the results in the DynamoDB table. 
+Scan your GitHub repositories with CloudFormation or AWS SAM code with cfn-lint. The stack deploys two Lambda functions, a Step Function, an S3 bucket and a DynamoDB table. You can invoke the scan using the Step Function which is provisioned. After a scan, you can review the results in the DynamoDB table. In addition, a CSV version of the scan output is stored on S3 for easier reviewing of results.
 
 
 ![alt text](./docs/architecture.png)
@@ -11,7 +11,17 @@ Scan your GitHub repositories with CloudFormation or AWS SAM code with cfn-lint.
 Installation
 ------------
 
-Run 'bash deploy.sh' in the root of the directory to deploy the stack. The neccesary infrastructure and dependancies will be built and provisioned automatically. 
+You need to have Docker, AWS SAM and cfn-lint installed on your machine. Next, run 'bash deploy.sh' in the root of the directory to deploy the stack. 
+
+The neccesary infrastructure and dependancies will be built and provisioned automatically. In the output of the SAM template, you can find the name and direct URL to the Step Function that kicks off the scan for one Github profile. 
+
+Within the Step Function input, configure the values as follows;
+
+```
+{
+    "GithubRepo": "<github user (i.e. 'marekq')>"
+}
+```
 
 
 Roadmap
