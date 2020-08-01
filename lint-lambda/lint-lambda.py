@@ -123,7 +123,7 @@ def get_repo(giturl, gitpath, srcuuid, keywords):
 
 # put ddb record
 @xray_recorder.capture("put_ddb")
-def put_ddb(gitrepo, gitpath, check_id, check_full, check_line_id, check_line_str, filename, disk_used, tmppath, srcuuid):
+def put_ddb(gitrepo, gitpath, check_id, check_full, check_line_id, filename, disk_used, tmppath, srcuuid):
 
     # get current time
     timest = int(time.time())
@@ -139,7 +139,6 @@ def put_ddb(gitrepo, gitpath, check_id, check_full, check_line_id, check_line_st
         'file_url' : "https://github.com/" + gitpath + "/blob/master/" + filename + "#L" + check_line_id,
         'file_name' : filename,
         'check_line_id' : check_line_id,
-        'check_line_full' : check_line_str, 
         'timest': timest,
         'check_text': check_full,
         'check_id': check_id,
@@ -192,11 +191,6 @@ def run_lint(cfnfile, gitpath, gitrepo, filename, disk_used, tmppath, srcuuid):
     # load the cfnfile
     template, matches = decode.decode(cfnfile, False)
 
-    with open(cfnfile) as f:
-        cfncontent = f.readlines()
-
-    count = 0
-
     # process all the rules 
     try:
         matches = core.run_checks(
@@ -209,10 +203,8 @@ def run_lint(cfnfile, gitpath, gitrepo, filename, disk_used, tmppath, srcuuid):
         for check_full in matches:
             check_id = str(check_full)[1:6]
             check_line_id = str(check_full).split(":")[-1]
-            check_line_str = str(cfncontent[int(check_line_id)])
 
-            put_ddb(gitrepo, gitpath, check_id, str(check_full), check_line_id, check_line_str, filename, disk_used, tmppath, srcuuid)
-            count += 1
+            put_ddb(gitrepo, gitpath, check_id, str(check_full), check_line_id, filename, disk_used, tmppath, srcuuid)
             
     except Exception as e:
         print('!!! error reading ' + gitpath + " " + filename + " " + str(e))

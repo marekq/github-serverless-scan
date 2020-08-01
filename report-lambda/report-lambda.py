@@ -14,7 +14,7 @@ ddb = boto3.resource('dynamodb', region_name = os.environ['AWS_REGION']).Table(o
 s3_bucket = os.environ['s3_bucket']
 
 # set the s3 signed url expiry to one day
-s3_link_expiry = '86400'
+s3_link_expiry = 86400
 
 
 # lambda handler
@@ -40,7 +40,6 @@ def handler(event, context):
 
 		for x in queryres['Items']:
 			res.append(x)
-			print(x)
 
 	# open the file for writing 
 	filen = open('/tmp/out.csv', 'w') 
