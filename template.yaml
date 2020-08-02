@@ -2,12 +2,22 @@ AWSTemplateFormatVersion: '2010-09-09'
 Transform: 'AWS::Serverless-2016-10-31'
 Description: Scan GitHub repositories with cfn-lint and store the results in DynamoDB
 
-Resources:
+Parameters:
+  destemail:
+    Type: String
+    Description: The receiving email address for scan report emails, leave blank to disable. You need to add this email to SES prior to deployment, see readme.md for more details. 
+    Default: marek.kuczynski@gmail.com
 
+  fromemail:
+    Type: String
+    Description: The source email address for scan report emails, leave blank to disable. You need to add this email to SES prior to deployment, see readme.md for more details. 
+    Default: aws@marek.rocks
+
+Resources:
   lambdalayer:
     Type: AWS::Serverless::LayerVersion
     Properties:
-      LayerName: gitlayer
+      LayerName: lambdalayer
       Description: Create a layer with gitpull tools
       ContentUri: lambda-layer/.
       CompatibleRuntimes:
@@ -20,7 +30,7 @@ Resources:
   resultbucket:
     Type: AWS::S3::Bucket
 
-  gitpull:
+  lintlambda:
     Type: AWS::Serverless::Function
     Properties:
       Layers:
@@ -32,14 +42,14 @@ Resources:
       Description: Scan Github repositories and store results in DynamoDB
       Policies:
         - DynamoDBCrudPolicy:
-            TableName: !Ref gittable
+            TableName: !Ref resulttable
       MemorySize: 1024
-      Timeout: 10
+      Timeout: 30
       Environment: 
         Variables:
-          dynamo_table: !Ref gittable
+          dynamo_table: !Ref resulttable
         
-  discoverrepo:
+  scanlambda:
     Type: AWS::Serverless::Function
     Properties:
       MemorySize: 256
@@ -63,7 +73,7 @@ Resources:
       MemorySize: 128
       Timeout: 3
 
-  genreport:
+  reportlambda:
     Type: AWS::Serverless::Function
     Properties:
       Layers:
@@ -77,15 +87,23 @@ Resources:
       Timeout: 30
       Environment: 
         Variables:
-          dynamo_table: !Ref gittable
+          dynamo_table: !Ref resulttable
           s3_bucket: !Ref resultbucket
+          dest_email: !Ref destemail
+          from_email: !Ref fromemail
       Policies:
+        - Version: '2012-10-17'
+          Statement:
+            - Effect: Allow
+              Action:
+                - 'ses:SendEmail'
+              Resource: '*'
         - DynamoDBCrudPolicy:
-            TableName: !Ref gittable  
+            TableName: !Ref resulttable  
         - S3CrudPolicy:
             BucketName: !Ref resultbucket
-
-  gittable:
+        
+  resulttable:
     Type: AWS::DynamoDB::Table
     Properties:
       AttributeDefinitions:
@@ -117,17 +135,17 @@ Resources:
     Properties:
       DefinitionUri: statemachine/gitscan.asl.json
       DefinitionSubstitutions:
-        gitscanlambda: !GetAtt discoverrepo.Arn
-        gitpulllambda: !GetAtt gitpull.Arn
-        genreportlambda: !GetAtt genreport.Arn
+        scanlambda: !GetAtt scanlambda.Arn
+        lintlambda: !GetAtt lintlambda.Arn
+        reportlambda: !GetAtt reportlambda.Arn
         tokenlambda: !GetAtt tokenlambda.Arn
       Policies: 
         - LambdaInvokePolicy:
-            FunctionName: !Ref discoverrepo
+            FunctionName: !Ref scanlambda
         - LambdaInvokePolicy:
-            FunctionName: !Ref gitpull
+            FunctionName: !Ref lintlambda
         - LambdaInvokePolicy:
-            FunctionName: !Ref genreport
+            FunctionName: !Ref reportlambda
         - LambdaInvokePolicy:
             FunctionName: !Ref tokenlambda
         - CloudWatchFullAccess

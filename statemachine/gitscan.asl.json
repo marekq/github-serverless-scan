@@ -41,7 +41,7 @@
               "Resource": "arn:aws:states:::lambda:invoke",
               "ResultPath": "$",
               "Parameters": {
-                "FunctionName": "${gitscanlambda}",
+                "FunctionName": "${scanlambda}",
                 "Payload": {  
                   "GithubRepo.$": "$.GithubRepo",
                   "ScanID.$": "$.ScanID"
@@ -55,7 +55,7 @@
               "ItemsPath": "$.Payload",
               "OutputPath": null,
               "Parameters": {
-                "MessageDetails.$": "$$.Map.Item.Value"
+                "msg.$": "$$.Map.Item.Value"
               },
               "Iterator": {
                 "StartAt": "Run GitHub Scan",
@@ -63,7 +63,7 @@
                   "Run GitHub Scan": {
                     "Type": "Task",
                     "Resource": "arn:aws:states:::lambda:invoke",
-                    "OutputPath": null,
+                    "OutputPath": "$.Payload",
                     "Retry": [
                       {
                         "ErrorEquals": [ "States.ALL" ],
@@ -73,9 +73,9 @@
                       }
                     ],
                     "Parameters": {
-                      "FunctionName": "${gitpulllambda}",
+                      "FunctionName": "${lintlambda}",
                       "Payload": {  
-                        "message.$": "$.MessageDetails"
+                        "message.$": "$.msg"
                      }
                     },
                     "End": true
@@ -93,7 +93,7 @@
       "OutputPath": "$.Payload",
       "InputPath": "$",
       "Parameters": {
-        "FunctionName": "${genreportlambda}",
+        "FunctionName": "${reportlambda}",
         "Payload": {  
           "Data.$": "$"
         }

@@ -36,6 +36,9 @@ ddb = boto3.resource('dynamodb', region_name = os.environ['AWS_REGION']).Table(o
 def get_repo(giturl, gitpath, srcuuid, keywords):
 
     cfnfiles = []
+    # create counter and validfile boolean
+    count = 0
+
 
     # create a temporary directory on /tmp to clone the repo
     with tempfile.TemporaryDirectory(dir = "/tmp") as tmppath:
@@ -43,9 +46,9 @@ def get_repo(giturl, gitpath, srcuuid, keywords):
         # clone the git repo 
         print("git http download " + giturl)
         resp = requests.get(giturl)
-        zname = tmppath + "/master.zip"
 
         # write zip file to temp disk
+        zname = tmppath + "/master.zip"
         zfile = open(zname, 'wb')
         zfile.write(resp.content)
         zfile.close()
@@ -53,24 +56,28 @@ def get_repo(giturl, gitpath, srcuuid, keywords):
         zipfiles = []
 
         # iterate of the zipfile content
-        with ZipFile(zname, 'r') as zipObj:
-            zlist = zipObj.namelist()
+        try:
+            with ZipFile(zname, 'r') as zipObj:
+                zlist = zipObj.namelist()
 
-            # extract only .yml, .yaml, .json or .template files from zip file listing
-            for zfile in zlist:
-                if zfile.endswith('.yml') or zfile.endswith('.yaml') or zfile.endswith('.json') or zfile.endswith('.template'):
-                    zipfiles.append(zfile)
+                # extract only .yml, .yaml, .json or .template files from zip file listing
+                for zfile in zlist:
+                    if zfile.endswith('.yml') or zfile.endswith('.yaml') or zfile.endswith('.json') or zfile.endswith('.template'):
+                        zipfiles.append(zfile)
 
-            # extract all cfnfiles
-            zipObj.extractall(path = tmppath, members = zipfiles)
+                # extract all cfnfiles
+                zipObj.extractall(path = tmppath, members = zipfiles)
+            
+            # delete the zip file from /tmp
+            os.remove(zname)
+
+        except Exception as e:
+            print('@@@ failed to extract ' + giturl + ' ' + str(e))
 
         # check local /tmp disk used
         total, used, free = shutil.disk_usage(tmppath)
         disk_used = str(round(used / (1024.0 ** 2), 2))
         print(gitpath + " disk used - " + disk_used + " MB")
-
-        # delete the zip file from /tmp
-        os.remove(zname)
 
         xray_recorder.current_subsegment().put_annotation('disk_usage', disk_used)
         xray_recorder.current_subsegment().put_annotation('gitrepo', giturl)
@@ -80,8 +87,6 @@ def get_repo(giturl, gitpath, srcuuid, keywords):
             for dirn in dirs:
                 for filen in files:
 
-                    # create counter and validfile boolean
-                    count = 0
                     validfile = False
 
                     if re.search('.yml', filen) or re.search('.yaml', filen) or re.search('.json', filen) or re.search('.template', filen):
@@ -111,14 +116,9 @@ def get_repo(giturl, gitpath, srcuuid, keywords):
                         else:
 
                             print("### skipping file " + filename)
-
-                    # print found messages count if validfile
-                    if validfile:
-
-                        print("&&& found " + str(count) + " matches in " + cfnfile)
                      
     # return discovered cfnfiles
-    return cfnfiles
+    return count
 
 
 # put ddb record
@@ -171,7 +171,7 @@ def check_cfnfile(cfnfile, gitpath, gitrepo, filename, disk_used, tmppath, srcuu
                 kw = keyw.strip()
 
                 # put a dynamodb record for the found keyword
-                put_ddb(gitrepo, gitpath, kw, '.', str(linec), line, filename, disk_used, tmppath, srcuuid)
+                put_ddb(gitrepo, gitpath, kw, str(linec), line, filename, disk_used, tmppath, srcuuid)
 
                 # increase count by 1
                 count += 1
@@ -191,6 +191,9 @@ def run_lint(cfnfile, gitpath, gitrepo, filename, disk_used, tmppath, srcuuid):
     # load the cfnfile
     template, matches = decode.decode(cfnfile, False)
 
+    # set counter to 0
+    count = 0
+
     # process all the rules 
     try:
         matches = core.run_checks(
@@ -203,6 +206,7 @@ def run_lint(cfnfile, gitpath, gitrepo, filename, disk_used, tmppath, srcuuid):
         for check_full in matches:
             check_id = str(check_full)[1:6]
             check_line_id = str(check_full).split(":")[-1]
+            count += 1
 
             put_ddb(gitrepo, gitpath, check_id, str(check_full), check_line_id, filename, disk_used, tmppath, srcuuid)
             
@@ -227,10 +231,9 @@ def handler(event, context):
     giturl = 'https://github.com/' + reponame + "/archive/" + branch + ".zip"
 
     # get the git repo
-    cfnfiles = get_repo(giturl, reponame, srcuuid, keywords)
+    count = get_repo(giturl, reponame, srcuuid, keywords)
 
     # return matched yaml files
-    print(cfnfiles)
     print("^^^ ddbscan uuid " + str(srcuuid))
 
-    return {'ScanUUID': srcuuid}
+    return {reponame: str(count)}
