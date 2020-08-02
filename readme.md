@@ -1,7 +1,9 @@
 github-serverless-scan
 ======================
 
-Scan your GitHub repositories with CloudFormation or AWS SAM code with cfn-lint. The stack deploys two Lambda functions, a Step Function, an S3 bucket and a DynamoDB table. You can invoke the scan using the Step Function which is provisioned. After a scan, you can review the results in the DynamoDB table. In addition, a CSV version of the scan output is stored on S3 for easier reviewing of results.
+Scan your GitHub repositories with CloudFormation or AWS SAM code with cfn-lint. The stack deploys two Lambda functions, a Step Function, an S3 bucket and a DynamoDB table. You can invoke the scan using the Step Function which is provisioned. 
+
+After a scan, you can review the results in the DynamoDB table. In addition, a CSV version of the scan output is stored on S3 for easier reviewing of results. Finally, you can select to optionally send an email with the results through SES.
 
 
 ![alt text](./docs/architecture.png)
@@ -32,6 +34,7 @@ Roadmap
 - [X] Create an easy export function to generate reports (i.e. as a CSV file or as a CloudWatch/QuickSight dashboard). 
 - [X] Convert the SQS setup to Step Functions, in order to provide more powerful scanning patterns and better debugging of scan results. 
 - [X] Add more intelligent retrieval of feature branches, right now only the main one is downloaded.
+- [X] Add email sending of report results. 
 
 
 Contact

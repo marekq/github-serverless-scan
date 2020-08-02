@@ -5,15 +5,21 @@ Description: Scan GitHub repositories with cfn-lint and store the results in Dyn
 Parameters:
   destemail:
     Type: String
-    Description: The receiving email address for scan report emails, leave blank to disable. You need to add this email to SES prior to deployment, see readme.md for more details. 
+    Description: Optional - the receiving email address for scan report emails, leave blank to disable. You need to add this email to SES prior to deployment, see readme.md for more details. 
     Default: marek.kuczynski@gmail.com
 
   fromemail:
     Type: String
-    Description: The source email address for scan report emails, leave blank to disable. You need to add this email to SES prior to deployment, see readme.md for more details. 
+    Description: Optional - the source email address for scan report emails, leave blank to disable. You need to add this email to SES prior to deployment, see readme.md for more details. 
     Default: aws@marek.rocks
 
+  githubtoken:
+    Type: String
+    Description: Optional but recommended - add a GitHub personal access token for GitHub API calls. You can create yours at https://github.com/settings/tokens .
+    Default: ''
+
 Resources:
+  # lambda layer with neccesary libraries
   lambdalayer:
     Type: AWS::Serverless::LayerVersion
     Properties:
@@ -27,9 +33,11 @@ Resources:
     Metadata:
       BuildMethod: python3.8
 
+  # s3 bucket for results
   resultbucket:
     Type: AWS::S3::Bucket
 
+  # perform a cloudformation check on a github repo 
   lintlambda:
     Type: AWS::Serverless::Function
     Properties:
@@ -48,7 +56,9 @@ Resources:
       Environment: 
         Variables:
           dynamo_table: !Ref resulttable
+          github_token: !Ref githubtoken
         
+  # scan the github profile of a user for repos
   scanlambda:
     Type: AWS::Serverless::Function
     Properties:
@@ -62,7 +72,11 @@ Resources:
       ReservedConcurrentExecutions: 1
       Layers:
         - !Ref lambdalayer
+      Environment:
+        Variables:
+          github_token: !Ref githubtoken
 
+  # generate a unique key for the scan results
   tokenlambda:
     Type: AWS::Serverless::Function
     Properties:
@@ -73,6 +87,7 @@ Resources:
       MemorySize: 128
       Timeout: 3
 
+  # retrieve the results of the github scan from dynamodb, optionally send an email
   reportlambda:
     Type: AWS::Serverless::Function
     Properties:
@@ -103,6 +118,7 @@ Resources:
         - S3CrudPolicy:
             BucketName: !Ref resultbucket
         
+  # dynamodb table for results
   resulttable:
     Type: AWS::DynamoDB::Table
     Properties:
@@ -127,9 +143,11 @@ Resources:
         Projection:
           ProjectionType: ALL
 
+  # s3 bucket for scan results
   scanlogs:
     Type: AWS::Logs::LogGroup
 
+  # state machine to coordinate the workflow
   gitstatemachine:
     Type: AWS::Serverless::StateMachine 
     Properties:
@@ -157,6 +175,7 @@ Resources:
           - CloudWatchLogsLogGroup:
               LogGroupArn: !GetAtt scanlogs.Arn
 
+# print the url of the state machine
 Outputs:
   StateMachineURL:
     Value: !Sub 'https://${AWS::Region}.console.aws.amazon.com/states/home?region=${AWS::Region}#/statemachines/view/${gitstatemachine}'
