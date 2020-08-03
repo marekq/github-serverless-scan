@@ -43,6 +43,7 @@ def get_repo(repoid, srcuuid, keywords, githubtoken):
     githubres = Github(githubtoken).get_repo(int(repoid))
 
     giturl = 'https://github.com/' + githubres.full_name + "/archive/" + githubres.default_branch + ".zip"
+    gitpath = githubres.full_name
 
     # create a temporary directory on /tmp to clone the repo
     with tempfile.TemporaryDirectory(dir = "/tmp") as tmppath:
@@ -122,7 +123,7 @@ def get_repo(repoid, srcuuid, keywords, githubtoken):
                             print("### skipping file " + filename)
                      
     # return discovered cfnfiles
-    return count
+    return count, giturl
 
 
 # put ddb record
@@ -149,8 +150,8 @@ def put_ddb(gitrepo, gitpath, check_id, check_full, check_line_id, filename, dis
         'disk_used': disk_used,
         'scan_uuid': srcuuid,
         'language': githubres.language,
-        'repo_created_at': githubres.created_at,
-        'repo_updated_at': githubres.updated_at,
+        'repo_created_at': str(githubres.created_at),
+        'repo_updated_at': str(githubres.updated_at),
         'repo_stars': githubres.stargazers_count,
         'repo_size': githubres.size,
         'repo_desc': githubres.description,
@@ -244,9 +245,9 @@ def handler(event, context):
     repoid, srcuuid = msg.split(',')
 
     # get the git repo, return the amount of detections for the repo
-    count = get_repo(repoid, srcuuid, keywords, githubtoken)
+    count, gitrepo = get_repo(repoid, srcuuid, keywords, githubtoken)
 
     # return matched yaml files
     print("^^^ ddbscan uuid " + str(srcuuid))
 
-    return {reponame: str(count)}
+    return {str(gitrepo): str(count)}
