@@ -21,17 +21,24 @@ s3_link_expiry = 86400
 
 # optional - send email to receiver
 @xray_recorder.capture("send_email")
-def send_email(githubuser, scanuuid, dest_email, res, tableheader):
+def send_email(githubuser, scanuuid, dest_email, res, tableheader, s3signed):
 
 		# create a simple html body for the email
-		mailmsg = '<html><body><h2>report for ' + githubuser + '</h2><br><table>'
-		mailmsg += '<th><td>' + tableheader + '</td></th>'
+		mailmsg = '<html><body><h2>report for ' + githubuser + '</h2><br>'
 
-		# create table row per dynamodb row
+		# add the link to s3 signed url file 
+		mailmsg += '<a href = ' + s3signed + '>link to csv file</a><br><table>'
+
+		# create the table header row
+		mailmsg += '<tr><th>' + tableheader + '</th></tr>'
+
+		# create a table row per dynamodb row
 		for x in res:
 			mailmsg += '<tr><td>' + '</td><td>'.join(map(str, x.values())) + '</td></tr>'
 
 		mailmsg += '</table></body></html>'
+
+		# create the email subject
 		mailsubj = 'GitHub scan report for ' + githubuser + ' - ' + scanuuid
 
 
@@ -95,7 +102,7 @@ def handler(event, context):
 	
 			# write the csv header
 			csv_writer.writerow(x.keys())
-			tableheader = '</td><td>'.join(x.keys())
+			tableheader = '</th><th>'.join(x.keys())
 			count += 1
 	
 		# write the csv record
@@ -116,7 +123,7 @@ def handler(event, context):
 
 	# check if an email was submitted to env variables, else skip
 	if re.search('@', dest_email):
-		send_email(githubuser, scanuuid, dest_email, res, tableheader)
+		send_email(githubuser, scanuuid, dest_email, res, tableheader, s3signed)
 
 	# return bucket name and file path
 	print(s3signed)
