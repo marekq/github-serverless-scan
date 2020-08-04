@@ -73,7 +73,7 @@ def handler(event, context):
 	githubuser = str(event['Data'][0]['GithubRepo'])
 
 	# retrieve the scan data
-	queryres = ddb.query(IndexName = 'scanguid', KeyConditionExpression = Key('scan_uuid').eq(scanuuid))
+	queryres = ddb.query(IndexName = 'scan_uuid', KeyConditionExpression = Key('scan_uuid').eq(scanuuid))
 
 	for x in queryres['Items']:
 		res.append(x)
@@ -81,7 +81,7 @@ def handler(event, context):
 	# paginate through scan data results
 	while 'LastEvaluatedKey' in queryres:
 		lastkey = queryres['LastEvaluatedKey']
-		queryres = ddb.query(IndexName = 'scanguid', KeyConditionExpression = Key('scan_uuid').eq(scanuuid), ExclusiveStartKey = lastkey)
+		queryres = ddb.query(IndexName = 'scan_uuid', KeyConditionExpression = Key('scan_uuid').eq(scanuuid), ExclusiveStartKey = lastkey)
 
 		for x in queryres['Items']:
 			res.append(x)

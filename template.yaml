@@ -118,6 +118,8 @@ Resources:
               Resource: '*'
         - DynamoDBCrudPolicy:
             TableName: !Ref scantable  
+        - DynamoDBCrudPolicy:
+            TableName: !Ref metadatatable
         - S3CrudPolicy:
             BucketName: !Ref resultbucket
         
