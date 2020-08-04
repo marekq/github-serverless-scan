@@ -47,73 +47,78 @@ def get_repo(repoid, scan_uuid, keywords, githubtoken):
 
     gitpath = githubres.full_name
     giturl = 'https://github.com/' + gitpath + "/archive/" + githubres.default_branch + ".zip"
+    gitsize = int(githubres.size)
 
-    # create a temporary directory on /tmp to clone the repo
-    with tempfile.TemporaryDirectory(dir = "/tmp") as tmppath:
+    # add url if size is more than 0kb but less than 400mb
+    if gitsize > 0 and gitsize < 400000:
+        # create a temporary directory on /tmp to clone the repo
+        with tempfile.TemporaryDirectory(dir = "/tmp") as tmppath:
 
-        # clone the git repo 
-        print("git http download " + giturl)
-        resp = requests.get(giturl)
+            # clone the git repo 
+            print("git http download " + giturl)
+            resp = requests.get(giturl)
 
-        # write zip file to temp disk
-        zname = tmppath + "/master.zip"
-        zfile = open(zname, 'wb')
-        zfile.write(resp.content)
-        zfile.close()
+            # write zip file to temp disk
+            zname = tmppath + "/master.zip"
+            zfile = open(zname, 'wb')
+            zfile.write(resp.content)
+            zfile.close()
 
-        zipfiles = []
+            zipfiles = []
 
-        # iterate of the zipfile content
-        try:
-            with ZipFile(zname, 'r') as zipObj:
-                zlist = zipObj.namelist()
+            # iterate of the zipfile content
+            try:
+                with ZipFile(zname, 'r') as zipObj:
+                    zlist = zipObj.namelist()
 
-                # extract only .yml, .yaml, .json or .template files from zip file listing
-                for zfile in zlist:
-                    if zfile.endswith('.yml') or zfile.endswith('.yaml') or zfile.endswith('.json') or zfile.endswith('.template'):
-                        zipfiles.append(zfile)
+                    # extract only .yml, .yaml, .json or .template files from zip file listing
+                    for zfile in zlist:
+                        if zfile.endswith('.yml') or zfile.endswith('.yaml') or zfile.endswith('.json') or zfile.endswith('.template'):
+                            zipfiles.append(zfile)
 
-                # extract all cfnfiles
-                zipObj.extractall(path = tmppath, members = zipfiles)
+                    # extract all cfnfiles
+                    zipObj.extractall(path = tmppath, members = zipfiles)
 
-        except Exception as e:
-            print('@@@ failed to extract ' + giturl + ' ' + str(e))
+            except Exception as e:
+                print('@@@ failed to extract ' + giturl + ' ' + str(e))
 
-        # check content of cloudformation files
-        for root, dirs, files in os.walk(tmppath, topdown = True):
-            for dirn in dirs:
-                for filen in files:
+            # check content of cloudformation files
+            for root, dirs, files in os.walk(tmppath, topdown = True):
+                for dirn in dirs:
+                    for filen in files:
 
-                    validfile = False
+                        validfile = False
 
-                    if re.search('.yml', filen) or re.search('.yaml', filen) or re.search('.json', filen) or re.search('.template', filen):
+                        if re.search('.yml', filen) or re.search('.yaml', filen) or re.search('.json', filen) or re.search('.template', filen):
 
-                        # create variable with file name
-                        cfnfile = os.path.join(root, filen)
-                        filename = '/'.join(cfnfile.split('/')[4:])
+                            # create variable with file name
+                            cfnfile = os.path.join(root, filen)
+                            filename = '/'.join(cfnfile.split('/')[4:])
 
-                        f = open(cfnfile, encoding = 'utf-8', errors = 'ignore').read()
+                            f = open(cfnfile, encoding = 'utf-8', errors = 'ignore').read()
 
-                        # Detect whether the file is likely a CloudFormation file based on the "Resources" field. 
-                        # The "AWSTemplateFormatVersion" field would be a better candidate, but only the "Resources" field is formally required; https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/template-anatomy.html
-                        pat = re.compile("Resources:", re.IGNORECASE)
+                            # Detect whether the file is likely a CloudFormation file based on the "Resources" field. 
+                            # The "AWSTemplateFormatVersion" field would be a better candidate, but only the "Resources" field is formally required; https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/template-anatomy.html
+                            pat = re.compile("Resources:", re.IGNORECASE)
 
-                        # if pattern is found
-                        if pat.search(f) != None:
+                            # if pattern is found
+                            if pat.search(f) != None:
 
-                            print("??? getting file " + giturl + " " + gitpath + " " + filename)
-                            
-                            # store cfnfiles in list
-                            validfile = True
+                                print("??? getting file " + giturl + " " + gitpath + " " + filename)
+                                
+                                # store cfnfiles in list
+                                validfile = True
 
-                            # scan the cfnfile and check for keywords, add the output count 
-                            count += run_lint(cfnfile, gitpath, giturl, filename, tmppath, scan_uuid, githubres)
-                            count += check_cfnfile(cfnfile, gitpath, giturl, filename, tmppath, scan_uuid, keywords, githubres)
+                                # scan the cfnfile and check for keywords, add the output count 
+                                count += run_lint(cfnfile, gitpath, giturl, filename, tmppath, scan_uuid, githubres)
+                                count += check_cfnfile(cfnfile, gitpath, giturl, filename, tmppath, scan_uuid, keywords, githubres)
 
-                        else:
+                            else:
 
-                            print("### skipping file " + filename)
-                     
+                                print("### skipping file " + filename)
+    else:
+        print("--- error - " + gitpath + " size " + str(gitsize))
+
     # return count and gitpath
     return str(count), gitpath
 
@@ -228,7 +233,7 @@ def run_lint(cfnfile, gitpath, gitrepo, filename, tmppath, scan_uuid, githubres)
             cfnfile,
             template,
             rules,
-            region
+            [region]
         )
     
         for check_full in matches:

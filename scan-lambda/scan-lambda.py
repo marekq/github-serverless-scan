@@ -25,17 +25,8 @@ def handler(event, context):
         # construct output message (repo id, repo branch (if not master), scan uuid)
         # as the map state can only have 32.768 characters as its input, the github id is used to save on the amount of characters needed per map iteration
         msg = str(repo.id) + "," + srcuuid
-        gitsize = int(repo.size)
-
-        # add url if size is more than 0kb but less than 400mb
-        if gitsize > 0 and gitsize < 400000:
-
-            res.append(msg)
-            print("adding " + msg)
-
-        else:
-
-            print("error - " + repo.full_name + " size " + str(gitsize))
+        res.append(msg)
+        print("adding " + msg)
 
     # print end message and return cfnfiles to step function
     print("returning " + str(len(res)) + " repos")

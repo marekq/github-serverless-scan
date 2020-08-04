@@ -155,12 +155,21 @@ Resources:
         AttributeType: S
       - AttributeName: gitrepo
         AttributeType: S
+      - AttributeName: scan_uuid
+        AttributeType: S
       KeySchema:
       - AttributeName: gituser
         KeyType: HASH
       - AttributeName: gitrepo
         KeyType: RANGE  
       BillingMode: PAY_PER_REQUEST
+      GlobalSecondaryIndexes:
+      - IndexName: scanguid
+        KeySchema:
+        - AttributeName: scan_uuid
+          KeyType: HASH
+        Projection:
+          ProjectionType: ALL
 
   # s3 bucket for scan results
   scanlogs:
