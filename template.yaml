@@ -139,7 +139,7 @@ Resources:
         KeyType: RANGE  
       BillingMode: PAY_PER_REQUEST
       GlobalSecondaryIndexes:
-      - IndexName: scanguid
+      - IndexName: scan_uuid
         KeySchema:
         - AttributeName: scan_uuid
           KeyType: HASH
@@ -157,6 +157,8 @@ Resources:
         AttributeType: S
       - AttributeName: scan_uuid
         AttributeType: S
+      - AttributeName: count
+        AttributeType: S
       KeySchema:
       - AttributeName: gituser
         KeyType: HASH
@@ -164,10 +166,12 @@ Resources:
         KeyType: RANGE  
       BillingMode: PAY_PER_REQUEST
       GlobalSecondaryIndexes:
-      - IndexName: scanguid
+      - IndexName: scan_uuid
         KeySchema:
         - AttributeName: scan_uuid
           KeyType: HASH
+        - AttributeName: count
+          KeyType: RANGE
         Projection:
           ProjectionType: ALL
 

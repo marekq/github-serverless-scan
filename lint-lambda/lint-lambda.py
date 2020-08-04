@@ -97,14 +97,13 @@ def get_repo(repoid, scan_uuid, keywords, githubtoken):
 
                             f = open(cfnfile, encoding = 'utf-8', errors = 'ignore').read()
 
-                            # Detect whether the file is likely a CloudFormation file based on the "Resources" field. 
-                            # The "AWSTemplateFormatVersion" field would be a better candidate, but only the "Resources" field is formally required; https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/template-anatomy.html
-                            pat = re.compile("Resources:", re.IGNORECASE)
+                            # Detect whether the file is likely a CloudFormation file based on the "AWSTemplateFormatVersion" field. 
+                            pat = re.compile("AWSTemplateFormatVersion", re.IGNORECASE)
 
                             # if pattern is found
                             if pat.search(f) != None:
 
-                                print("??? getting file " + giturl + " " + gitpath + " " + filename)
+                                print("??? scanning file " + giturl + " " + gitpath + " " + filename)
                                 
                                 # store cfnfiles in list
                                 validfile = True
