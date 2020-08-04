@@ -15,7 +15,7 @@ rules = core.get_rules([], [], ['I', 'E', 'W'], [], True, [])
 # retrieve the dynamodb tables from env vars
 dynamo_table_metadata = os.environ['dynamo_table_metadata']
 dynamo_table_scan = os.environ['dynamo_table_scan']
-region = os.environ['AWS_REGION']
+region = str(os.environ['AWS_REGION'])
 
 # connect to dynamodb
 ddb_scan = boto3.resource('dynamodb', region_name = region).Table(dynamo_table_scan)
