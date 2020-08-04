@@ -100,7 +100,7 @@ def get_repo(repoid, srcuuid, keywords, githubtoken):
                         cfnfile = os.path.join(root, filen)
                         filename = '/'.join(cfnfile.split('/')[4:])
 
-                        f = open(cfnfile).read()
+                        f = open(cfnfile, encoding = 'utf-8', errors = 'ignore').read()
 
                         # Detect whether the file is likely a CloudFormation file based on the "Resources" field. 
                         # The "AWSTemplateFormatVersion" field would be a better candidate, but only the "Resources" field is formally required; https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/template-anatomy.html
@@ -168,13 +168,13 @@ def put_ddb(gitrepo, gitpath, check_id, check_full, check_line_id, filename, dis
 # check the yaml file for serverless lines
 @xray_recorder.capture("check_cfnfile")
 def check_cfnfile(cfnfile, gitpath, gitrepo, filename, disk_used, tmppath, srcuuid, keywords, githubres):
-    linec = 0
-    count = 0
+    check_line_id = 0
+    check_count = 0
 
-    # check the cfnfile for keywords
+    # check the cfnfile line by line for keywords
     for line in open(cfnfile):
 
-        linec += 1
+        check_line_id += 1
 
         for keyw in keywords:
 
@@ -183,17 +183,17 @@ def check_cfnfile(cfnfile, gitpath, gitrepo, filename, disk_used, tmppath, srcuu
                 kw = keyw.strip()
 
                 # put a dynamodb record for the found keyword
-                put_ddb(gitrepo, gitpath, kw, str(linec), line, filename, disk_used, tmppath, srcuuid, githubres)
+                put_ddb(gitrepo, gitpath, kw, kw, str(check_line_id), filename, disk_used, tmppath, srcuuid, githubres)
 
                 # increase count by 1
-                count += 1
+                check_count += 1
 
         # if the string contains an s3 code uri, try to retrieve the s3 artifact
         if re.search("CodeUri: s3://", line):
             print("$$$ " + line.strip() + " " + gitrepo + " " + gitpath)
 
     # return the found count of checks
-    return count
+    return check_count
 
 
 # run cfn-lint
@@ -221,7 +221,7 @@ def run_lint(cfnfile, gitpath, gitrepo, filename, disk_used, tmppath, srcuuid, g
             count += 1
 
             put_ddb(gitrepo, gitpath, check_id, str(check_full), check_line_id, filename, disk_used, tmppath, srcuuid, githubres)
-            
+
     except Exception as e:
         print('!!! error reading ' + gitpath + " " + filename + " " + str(e))
 

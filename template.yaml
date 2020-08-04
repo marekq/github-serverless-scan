@@ -52,7 +52,7 @@ Resources:
         - DynamoDBCrudPolicy:
             TableName: !Ref resulttable
       MemorySize: 1024
-      Timeout: 30
+      Timeout: 60
       Environment: 
         Variables:
           dynamo_table: !Ref resulttable
