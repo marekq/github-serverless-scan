@@ -50,12 +50,15 @@ Resources:
       Description: Scan Github repositories and store results in DynamoDB
       Policies:
         - DynamoDBCrudPolicy:
-            TableName: !Ref resulttable
+            TableName: !Ref scantable
+        - DynamoDBCrudPolicy:
+            TableName: !Ref metadatatable
       MemorySize: 1024
       Timeout: 60
       Environment: 
         Variables:
-          dynamo_table: !Ref resulttable
+          dynamo_table_metadata: !Ref metadatatable
+          dynamo_table_scan: !Ref scantable
           github_token: !Ref githubtoken
         
   # scan the github profile of a user for repos
@@ -102,7 +105,7 @@ Resources:
       Timeout: 30
       Environment: 
         Variables:
-          dynamo_table: !Ref resulttable
+          dynamo_table: !Ref scantable
           s3_bucket: !Ref resultbucket
           dest_email: !Ref destemail
           from_email: !Ref fromemail
@@ -114,12 +117,12 @@ Resources:
                 - 'ses:SendEmail'
               Resource: '*'
         - DynamoDBCrudPolicy:
-            TableName: !Ref resulttable  
+            TableName: !Ref scantable  
         - S3CrudPolicy:
             BucketName: !Ref resultbucket
         
   # dynamodb table for results
-  resulttable:
+  scantable:
     Type: AWS::DynamoDB::Table
     Properties:
       AttributeDefinitions:
@@ -142,6 +145,22 @@ Resources:
           KeyType: HASH
         Projection:
           ProjectionType: ALL
+
+  # dynamodb table for scan metadata
+  metadatatable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      AttributeDefinitions:
+      - AttributeName: gituser
+        AttributeType: S
+      - AttributeName: gitrepo
+        AttributeType: S
+      KeySchema:
+      - AttributeName: gituser
+        KeyType: HASH
+      - AttributeName: gitrepo
+        KeyType: RANGE  
+      BillingMode: PAY_PER_REQUEST
 
   # s3 bucket for scan results
   scanlogs:

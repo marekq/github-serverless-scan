@@ -11,8 +11,15 @@ patch_all()
 # initialize the cfn-lint ruleset to be applied
 rules = core.get_rules([], [], ['I', 'E', 'W'], [], True, [])
 
-# retrieve aws region where the lambda runs
-region = [os.environ['AWS_REGION']]
+
+# retrieve the dynamodb tables from env vars
+dynamo_table_metadata = os.environ['dynamo_table_metadata']
+dynamo_table_scan = os.environ['dynamo_table_scan']
+region = os.environ['AWS_REGION']
+
+# connect to dynamodb
+ddb_scan = boto3.resource('dynamodb', region_name = region).Table(dynamo_table_scan)
+ddb_meta = boto3.resource('dynamodb', region_name = region).Table(dynamo_table_metadata)
 
 
 # load cfnfile keywords from keywords.txt
@@ -28,13 +35,9 @@ def load_keywords():
     return kw
 
 
-# connect to dynamodb
-ddb = boto3.resource('dynamodb', region_name = os.environ['AWS_REGION']).Table(os.environ['dynamo_table'])
-
-
 # clone the given git repo to local disk, search for interesting cfnfiles
 @xray_recorder.capture("get_repo")
-def get_repo(repoid, srcuuid, keywords, githubtoken):
+def get_repo(repoid, scan_uuid, keywords, githubtoken):
 
     # create check count
     count = 0
@@ -42,8 +45,8 @@ def get_repo(repoid, srcuuid, keywords, githubtoken):
     # get the github repo details
     githubres = Github(githubtoken).get_repo(int(repoid))
 
-    giturl = 'https://github.com/' + githubres.full_name + "/archive/" + githubres.default_branch + ".zip"
     gitpath = githubres.full_name
+    giturl = 'https://github.com/' + gitpath + "/archive/" + githubres.default_branch + ".zip"
 
     # create a temporary directory on /tmp to clone the repo
     with tempfile.TemporaryDirectory(dir = "/tmp") as tmppath:
@@ -72,20 +75,9 @@ def get_repo(repoid, srcuuid, keywords, githubtoken):
 
                 # extract all cfnfiles
                 zipObj.extractall(path = tmppath, members = zipfiles)
-            
-            # delete the zip file from /tmp
-            os.remove(zname)
 
         except Exception as e:
             print('@@@ failed to extract ' + giturl + ' ' + str(e))
-
-        # check local /tmp disk used
-        total, used, free = shutil.disk_usage(tmppath)
-        disk_used = str(round(used / (1024.0 ** 2), 2))
-        print(githubres.full_name + " disk used - " + disk_used + " MB")
-
-        xray_recorder.current_subsegment().put_annotation('disk_usage', disk_used)
-        xray_recorder.current_subsegment().put_annotation('gitrepo', giturl)
 
         # check content of cloudformation files
         for root, dirs, files in os.walk(tmppath, topdown = True):
@@ -115,20 +107,45 @@ def get_repo(repoid, srcuuid, keywords, githubtoken):
                             validfile = True
 
                             # scan the cfnfile and check for keywords, add the output count 
-                            count += run_lint(cfnfile, gitpath, giturl, filename, disk_used, tmppath, srcuuid, githubres)
-                            count += check_cfnfile(cfnfile, gitpath, giturl, filename, disk_used, tmppath, srcuuid, keywords, githubres)
+                            count += run_lint(cfnfile, gitpath, giturl, filename, tmppath, scan_uuid, githubres)
+                            count += check_cfnfile(cfnfile, gitpath, giturl, filename, tmppath, scan_uuid, keywords, githubres)
 
                         else:
 
                             print("### skipping file " + filename)
                      
-    # return discovered cfnfiles
-    return count, giturl
+    # return count and gitpath
+    return str(count), gitpath
 
 
-# put ddb record
-@xray_recorder.capture("put_ddb")
-def put_ddb(gitrepo, gitpath, check_id, check_full, check_line_id, filename, disk_used, tmppath, srcuuid, githubres):
+# put dynamodb metadata record
+@xray_recorder.capture("put_ddb_metadata")
+def put_ddb_metadata(scan_uuid, gitpath, count):
+
+    # get current time
+    timest = int(time.time())
+
+    # get gitprofile and gitrepo
+    gituser, gitrepo = gitpath.split('/')
+
+    # construct the dynamodb record
+    ddbitem = {
+        'gituser' : gituser,
+        'gitrepo' : gitrepo,
+        'timest': timest,
+        'scan_uuid': scan_uuid,
+        'count': count
+    }
+
+    # put the item into dynamodb
+    ddb_meta.put_item(
+        TableName = dynamo_table_metadata, 
+        Item = ddbitem
+    )
+
+# put dynamodb scan result record
+@xray_recorder.capture("put_ddb_result")
+def put_ddb_result(gitrepo, gitpath, check_id, check_full, check_line_id, filename, tmppath, scan_uuid, githubres):
 
     # get current time
     timest = int(time.time())
@@ -147,8 +164,7 @@ def put_ddb(gitrepo, gitpath, check_id, check_full, check_line_id, filename, dis
         'timest': timest,
         'check_text': check_full,
         'check_id': check_id,
-        'disk_used': disk_used,
-        'scan_uuid': srcuuid,
+        'scan_uuid': scan_uuid,
         'language': githubres.language,
         'repo_created_at': str(githubres.created_at),
         'repo_updated_at': str(githubres.updated_at),
@@ -159,15 +175,15 @@ def put_ddb(gitrepo, gitpath, check_id, check_full, check_line_id, filename, dis
     }
 
     # put the item into dynamodb
-    ddb.put_item(
-        TableName = os.environ['dynamo_table'], 
+    ddb_scan.put_item(
+        TableName = dynamo_table_scan, 
         Item = ddbitem
     )
 
 
 # check the yaml file for serverless lines
 @xray_recorder.capture("check_cfnfile")
-def check_cfnfile(cfnfile, gitpath, gitrepo, filename, disk_used, tmppath, srcuuid, keywords, githubres):
+def check_cfnfile(cfnfile, gitpath, gitrepo, filename, tmppath, scan_uuid, keywords, githubres):
     check_line_id = 0
     check_count = 0
 
@@ -176,14 +192,14 @@ def check_cfnfile(cfnfile, gitpath, gitrepo, filename, disk_used, tmppath, srcuu
 
         check_line_id += 1
 
-        for keyw in keywords:
+        for keyword in keywords:
 
             # check if the keyword exists in line
-            if re.search(keyw, line):
-                kw = keyw.strip()
+            if re.search(keyword, line):
+                found_keyword = keyword.strip()
 
                 # put a dynamodb record for the found keyword
-                put_ddb(gitrepo, gitpath, kw, kw, str(check_line_id), filename, disk_used, tmppath, srcuuid, githubres)
+                put_ddb_result(gitrepo, gitpath, found_keyword, found_keyword, str(check_line_id), filename, tmppath, scan_uuid, githubres)
 
                 # increase count by 1
                 check_count += 1
@@ -198,7 +214,7 @@ def check_cfnfile(cfnfile, gitpath, gitrepo, filename, disk_used, tmppath, srcuu
 
 # run cfn-lint
 @xray_recorder.capture("run_lint")
-def run_lint(cfnfile, gitpath, gitrepo, filename, disk_used, tmppath, srcuuid, githubres):
+def run_lint(cfnfile, gitpath, gitrepo, filename, tmppath, scan_uuid, githubres):
 
     # load the cfnfile
     template, matches = decode.decode(cfnfile, False)
@@ -220,7 +236,7 @@ def run_lint(cfnfile, gitpath, gitrepo, filename, disk_used, tmppath, srcuuid, g
             check_line_id = str(check_full).split(":")[-1]
             count += 1
 
-            put_ddb(gitrepo, gitpath, check_id, str(check_full), check_line_id, filename, disk_used, tmppath, srcuuid, githubres)
+            put_ddb_result(gitrepo, gitpath, check_id, str(check_full), check_line_id, filename, tmppath, scan_uuid, githubres)
 
     except Exception as e:
         print('!!! error reading ' + gitpath + " " + filename + " " + str(e))
@@ -242,12 +258,13 @@ def handler(event, context):
     # load cfnfile keywords    
     keywords = load_keywords()
 
-    repoid, srcuuid = msg.split(',')
+    repoid, scan_uuid = msg.split(',')
 
     # get the git repo, return the amount of detections for the repo
-    count, gitrepo = get_repo(repoid, srcuuid, keywords, githubtoken)
+    count, gitpath = get_repo(repoid, scan_uuid, keywords, githubtoken)
 
-    # return matched yaml files
-    print("^^^ ddbscan uuid " + str(srcuuid))
+    # return dynamodb scan id and write metadata record
+    print("^^^ ddbscan uuid " + str(scan_uuid))
+    put_ddb_metadata(scan_uuid, gitpath, count)
 
-    return {str(gitrepo): str(count)}
+    return {str(gitpath): str(count)}
