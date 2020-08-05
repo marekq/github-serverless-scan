@@ -83,6 +83,8 @@ Resources:
   tokenlambda:
     Type: AWS::Serverless::Function
     Properties:
+      Layers:
+        - !Ref lambdalayer
       Runtime: python3.8
       CodeUri: ./token-lambda
       Tracing: Active
@@ -102,7 +104,7 @@ Resources:
       Tracing: Active
       Description: Store scan results from DynamoDB
       MemorySize: 128
-      Timeout: 30
+      Timeout: 60
       Environment: 
         Variables:
           dynamo_table: !Ref scantable
