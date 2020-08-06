@@ -51,6 +51,7 @@ def get_repo(repoid, scan_uuid, keywords, githubtoken):
 
     # add url if size is more than 0kb but less than 400mb
     if gitsize > 0 and gitsize < 400000:
+
         # create a temporary directory on /tmp to clone the repo
         with tempfile.TemporaryDirectory(dir = "/tmp") as tmppath:
 
@@ -59,62 +60,44 @@ def get_repo(repoid, scan_uuid, keywords, githubtoken):
             resp = requests.get(giturl)
 
             # write zip file to temp disk
-            zname = tmppath + "/master.zip"
+            zname = tmppath + "/main.zip"
             zfile = open(zname, 'wb')
             zfile.write(resp.content)
             zfile.close()
 
-            zipfiles = []
-
             # iterate of the zipfile content
-            try:
-                with ZipFile(zname, 'r') as zipObj:
-                    zlist = zipObj.namelist()
+            with ZipFile(zname, 'r') as zipObj:
+                zipfiles = []
+                zlist = zipObj.namelist()
 
-                    # extract only .yml, .yaml, .json or .template files from zip file listing
-                    for zfile in zlist:
-                        if zfile.endswith('.yml') or zfile.endswith('.yaml') or zfile.endswith('.json') or zfile.endswith('.template'):
-                            zipfiles.append(zfile)
+                # extract only .yml, .yaml, .json or .template files from zip file listing
+                for filename in zlist:
+                    if filename.endswith('.yml') or filename.endswith('.yaml') or filename.endswith('.json') or filename.endswith('.template'):
+                        zipfiles.append(filename)
+                        zipObj.extract(path = tmppath, member = filename)
 
-                    # extract all cfnfiles
-                    zipObj.extractall(path = tmppath, members = zipfiles)
+                        # get the location of the unzipped file
+                        tmpfile = tmppath + '/' + filename
 
-            except Exception as e:
-                print('@@@ failed to extract ' + giturl + ' ' + str(e))
+                        # read the template, replace invalid chars
+                        f = open(tmpfile, errors = 'replace').read()
 
-            # check content of cloudformation files
-            for root, dirs, files in os.walk(tmppath, topdown = True):
-                for dirn in dirs:
-                    for filen in files:
+                        # detect whether the file is likely a CloudFormation file based on the "AWSTemplateFormatVersion" field. 
+                        pat = re.compile("AWSTemplateFormatVersion", re.IGNORECASE)
 
-                        validfile = False
+                        # if cloudformation pattern is found in file
+                        if pat.search(f) != None:
 
-                        if re.search('.yml', filen) or re.search('.yaml', filen) or re.search('.json', filen) or re.search('.template', filen):
+                            print("??? scanning file " + giturl + " " + gitpath + " " + filename)
+                            
+                            # scan the cfnfile and check for keywords, add the output count 
+                            count += run_lint(tmpfile, gitpath, giturl, filename, tmppath, scan_uuid, githubres)
+                            count += check_cfnfile(tmpfile, gitpath, giturl, filename, tmppath, scan_uuid, keywords, githubres)
 
-                            # create variable with file name
-                            cfnfile = os.path.join(root, filen)
-                            filename = '/'.join(cfnfile.split('/')[4:])
+                        else:
 
-                            f = open(cfnfile, encoding = 'utf-8', errors = 'ignore').read()
+                            print("### skipping file " + filename)
 
-                            # Detect whether the file is likely a CloudFormation file based on the "AWSTemplateFormatVersion" field. 
-                            pat = re.compile("AWSTemplateFormatVersion", re.IGNORECASE)
-
-                            # if pattern is found
-                            if pat.search(f) != None:
-
-                                print("??? scanning file " + giturl + " " + gitpath + " " + filename)
-                                
-                                # store cfnfiles in list
-                                validfile = True
-
-                                # scan the cfnfile and check for keywords, add the output count 
-                                count += run_lint(cfnfile, gitpath, giturl, filename, tmppath, scan_uuid, githubres)
-                                count += check_cfnfile(cfnfile, gitpath, giturl, filename, tmppath, scan_uuid, keywords, githubres)
-
-                            else:
-
-                                print("### skipping file " + filename)
     else:
         print("--- error - " + gitpath + " size " + str(gitsize))
 
