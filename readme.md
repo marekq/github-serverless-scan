@@ -21,7 +21,8 @@ Within the Step Function input, configure the values as follows;
 
 ```
 {
-    "GithubRepo": "<github user (i.e. 'marekq')>"
+    "GithubRepo": "<github user (i.e. 'marekq')>",
+    "ScanID": "<optional parameter - set a scan id for dynamodb results>
 }
 ```
 

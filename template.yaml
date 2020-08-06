@@ -53,7 +53,7 @@ Resources:
             TableName: !Ref scantable
         - DynamoDBCrudPolicy:
             TableName: !Ref metadatatable
-      MemorySize: 1024
+      MemorySize: 1536
       Timeout: 60
       Environment: 
         Variables:
@@ -103,7 +103,7 @@ Resources:
       CodeUri: ./report-lambda
       Tracing: Active
       Description: Store scan results from DynamoDB
-      MemorySize: 128
+      MemorySize: 512
       Timeout: 60
       Environment: 
         Variables:
