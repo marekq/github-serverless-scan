@@ -102,12 +102,12 @@ def get_repo(repoid, scan_uuid, keywords, githubtoken):
         print("--- error - " + gitpath + " size " + str(gitsize))
 
     # return count and gitpath
-    return str(count), gitpath
+    return int(count), gitpath
 
 
 # put dynamodb metadata record
 @xray_recorder.capture("put_ddb_metadata")
-def put_ddb_metadata(scan_uuid, gitpath, count):
+def put_ddb_metadata(scan_uuid, gitpath, count_finding):
 
     # get current time
     timest = int(time.time())
@@ -119,9 +119,9 @@ def put_ddb_metadata(scan_uuid, gitpath, count):
     ddbitem = {
         'gituser' : gituser,
         'gitrepo' : gitrepo,
-        'timest': timest,
+        'timest': int(timest),
         'scan_uuid': scan_uuid,
-        'count': count
+        'count_finding': int(count_finding)
     }
 
     # put the item into dynamodb
@@ -132,7 +132,7 @@ def put_ddb_metadata(scan_uuid, gitpath, count):
 
 # put dynamodb scan result record
 @xray_recorder.capture("put_ddb_result")
-def put_ddb_result(gitrepo, gitpath, check_id, check_full, check_line_id, filename, tmppath, scan_uuid, githubres):
+def put_ddb_result(gitrepo, gitpath, check_id, check_full, check_line_id, check_type, filename, tmppath, scan_uuid, githubres):
 
     # get current time
     timest = int(time.time())
@@ -147,18 +147,19 @@ def put_ddb_result(gitrepo, gitpath, check_id, check_full, check_line_id, filena
         'gitrepo' : gitrepo,
         'file_url' : "https://github.com/" + gitpath + "/blob/master/" + filename + "#L" + check_line_id,
         'file_name' : filename,
-        'check_line_id' : check_line_id,
+        'check_line_id' : int(check_line_id),
         'timest': timest,
-        'check_text': check_full,
+        'check_text': check_full.strip(),
         'check_id': check_id,
+        'check_type': check_type,
         'scan_uuid': scan_uuid,
         'language': githubres.language,
         'repo_created_at': str(githubres.created_at),
         'repo_updated_at': str(githubres.updated_at),
-        'repo_stars': githubres.stargazers_count,
-        'repo_size': githubres.size,
+        'repo_stars': int(githubres.stargazers_count),
+        'repo_size': int(githubres.size),
         'repo_desc': githubres.description,
-        'repo_forks': githubres.forks
+        'repo_forks': int(githubres.forks)
     }
 
     # put the item into dynamodb
@@ -184,9 +185,10 @@ def check_cfnfile(cfnfile, gitpath, gitrepo, filename, tmppath, scan_uuid, keywo
             # check if the keyword exists in line
             if re.search(keyword, line):
                 found_keyword = keyword.strip()
+                check_type = 'check_keyword'
 
                 # put a dynamodb record for the found keyword
-                put_ddb_result(gitrepo, gitpath, found_keyword, found_keyword, str(check_line_id), filename, tmppath, scan_uuid, githubres)
+                put_ddb_result(gitrepo, gitpath, found_keyword, found_keyword, str(check_line_id), check_type, filename, tmppath, scan_uuid, githubres)
 
                 # increase count by 1
                 check_count += 1
@@ -218,12 +220,14 @@ def run_lint(cfnfile, gitpath, gitrepo, filename, tmppath, scan_uuid, githubres)
             [region]
         )
     
+        check_type = 'cfn_lint'
+
         for check_full in matches:
             check_id = str(check_full)[1:6]
             check_line_id = str(check_full).split(":")[-1]
             count += 1
 
-            put_ddb_result(gitrepo, gitpath, check_id, str(check_full), check_line_id, filename, tmppath, scan_uuid, githubres)
+            put_ddb_result(gitrepo, gitpath, check_id, str(check_full), check_line_id, check_type, filename, tmppath, scan_uuid, githubres)
 
     except Exception as e:
         print('!!! error reading ' + gitpath + " " + filename + " " + str(e))
@@ -248,10 +252,10 @@ def handler(event, context):
     repoid, scan_uuid = msg.split(',')
 
     # get the git repo, return the amount of detections for the repo
-    count, gitpath = get_repo(repoid, scan_uuid, keywords, githubtoken)
+    count_finding, gitpath = get_repo(repoid, scan_uuid, keywords, githubtoken)
 
     # return dynamodb scan id and write metadata record
     print("^^^ ddbscan uuid " + str(scan_uuid))
-    put_ddb_metadata(scan_uuid, gitpath, count)
+    put_ddb_metadata(scan_uuid, gitpath, count_finding)
 
-    return {str(gitpath): str(count)}
+    return {str(gitpath): str(count_finding)}

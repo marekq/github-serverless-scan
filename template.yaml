@@ -103,11 +103,12 @@ Resources:
       CodeUri: ./report-lambda
       Tracing: Active
       Description: Store scan results from DynamoDB
-      MemorySize: 512
-      Timeout: 60
+      MemorySize: 256
+      Timeout: 30
       Environment: 
         Variables:
-          dynamo_table: !Ref scantable
+          dynamo_meta_table: !Ref metadatatable
+          dynamo_scan_table: !Ref scantable
           s3_bucket: !Ref resultbucket
           dest_email: !Ref destemail
           from_email: !Ref fromemail
@@ -117,11 +118,11 @@ Resources:
             - Effect: Allow
               Action:
                 - 'ses:SendEmail'
-              Resource: '*'
-        - DynamoDBCrudPolicy:
-            TableName: !Ref scantable  
+              Resource: '*'  
         - DynamoDBCrudPolicy:
             TableName: !Ref metadatatable
+        - DynamoDBCrudPolicy:
+            TableName: !Ref scantable
         - S3CrudPolicy:
             BucketName: !Ref resultbucket
         
@@ -143,7 +144,7 @@ Resources:
         KeyType: RANGE  
       BillingMode: PAY_PER_REQUEST
       GlobalSecondaryIndexes:
-      - IndexName: scan_uuid
+      - IndexName: scantable_uuid
         KeySchema:
         - AttributeName: scan_uuid
           KeyType: HASH
@@ -161,8 +162,8 @@ Resources:
         AttributeType: S
       - AttributeName: scan_uuid
         AttributeType: S
-      - AttributeName: count
-        AttributeType: S
+      - AttributeName: count_finding
+        AttributeType: N
       KeySchema:
       - AttributeName: gituser
         KeyType: HASH
@@ -170,11 +171,11 @@ Resources:
         KeyType: RANGE  
       BillingMode: PAY_PER_REQUEST
       GlobalSecondaryIndexes:
-      - IndexName: scan_uuid
+      - IndexName: metatable_scan_uuid
         KeySchema:
         - AttributeName: scan_uuid
           KeyType: HASH
-        - AttributeName: count
+        - AttributeName: count_finding
           KeyType: RANGE
         Projection:
           ProjectionType: ALL

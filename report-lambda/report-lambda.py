@@ -8,7 +8,9 @@ patch_all()
 
 # create connection to s3, dynamodb and ses
 s3 = boto3.client('s3')
-ddb = boto3.resource('dynamodb', region_name = os.environ['AWS_REGION']).Table(os.environ['dynamo_table'])
+
+ddb_scan = boto3.resource('dynamodb', region_name = os.environ['AWS_REGION']).Table(os.environ['dynamo_scan_table'])
+ddb_meta = boto3.resource('dynamodb', region_name = os.environ['AWS_REGION']).Table(os.environ['dynamo_meta_table'])
 ses = boto3.client('ses')
 
 # get s3 bucket name and ses destination email from env var
@@ -27,7 +29,7 @@ def send_email(githubuser, scanuuid, dest_email, res, tableheader, s3signed):
 		mailmsg = '<html><body><h2>report for ' + githubuser + '</h2><br>'
 
 		# add the link to s3 signed url file 
-		mailmsg += '<a href = ' + s3signed + '>link to csv file</a><br><table>'
+		mailmsg += '<a href = ' + s3signed + '>link to csv file</a><br><table><br>'
 
 		# create the table header row
 		mailmsg += '<tr><th>' + tableheader + '</th></tr>'
@@ -64,7 +66,8 @@ def send_email(githubuser, scanuuid, dest_email, res, tableheader, s3signed):
 # lambda handler
 @xray_recorder.capture("handler")
 def handler(event, context):
-	res = []
+	meta_res = []
+	scan_res = []
 
 	# retrieve the scan id from step functions input
 	scanuuid = str(event['Data'][0]['ScanID'])
@@ -72,19 +75,34 @@ def handler(event, context):
 	# retrieve the github user name from step function input
 	githubuser = str(event['Data'][0]['GithubRepo'])
 
-	# retrieve the scan data
-	queryres = ddb.query(IndexName = 'scan_uuid', KeyConditionExpression = Key('scan_uuid').eq(scanuuid))
+	# retrieve the dynamodb metadata data
+	queryres = ddb_meta.query(IndexName = 'metatable_scan_uuid', KeyConditionExpression = Key('scan_uuid').eq(scanuuid) & Key('count_finding').gte(0), ProjectionExpression = 'count_finding, gituser, gitrepo')
 
 	for x in queryres['Items']:
-		res.append(x)
+		meta_res.append(x)
 
 	# paginate through scan data results
 	while 'LastEvaluatedKey' in queryres:
 		lastkey = queryres['LastEvaluatedKey']
-		queryres = ddb.query(IndexName = 'scan_uuid', KeyConditionExpression = Key('scan_uuid').eq(scanuuid), ExclusiveStartKey = lastkey)
+		queryres = ddb_meta.query(IndexName = 'metatable_scan_uuid', KeyConditionExpression = Key('scan_uuid').eq(scanuuid) & Key('count_finding').gte(0), ProjectionExpression = 'count_finding, gituser, gitrepo', ExclusiveStartKey = lastkey)
 
 		for x in queryres['Items']:
-			res.append(x)
+			meta_res.append(x)
+
+
+	# retrieve the dynamodb scan data
+	queryres = ddb_scan.query(IndexName = 'scantable_uuid', KeyConditionExpression = Key('scan_uuid').eq(scanuuid), ProjectionExpression = 'count_finding, gituser, gitrepo')
+
+	for x in queryres['Items']:
+		scan_res.append(x)
+
+	# paginate through scan data results
+	while 'LastEvaluatedKey' in queryres:
+		lastkey = queryres['LastEvaluatedKey']
+		queryres = ddb_scan.query(IndexName = 'scantable_uuid', KeyConditionExpression = Key('scan_uuid').eq(scanuuid), ProjectionExpression = 'count_finding, gituser, gitrepo', ExclusiveStartKey = lastkey)
+
+		for x in queryres['Items']:
+			scan_res.append(x)
 
 	# open the file for writing 
 	filen = open('/tmp/out.csv', 'w') 
@@ -97,7 +115,7 @@ def handler(event, context):
 	tableheader = ''
 
 	# iterate over results
-	for x in res: 
+	for x in scan_res: 
 		if count == 0: 
 	
 			# write the csv header
@@ -113,7 +131,6 @@ def handler(event, context):
 
 	# create s3 filename
 	s3filename = githubuser + "_" + scanuuid + ".csv"
-	print(s3filename)
 
 	# upload the report file to s3
 	s3.put_object(Bucket = s3_bucket, Body = open('/tmp/out.csv', 'rb'), Key = s3filename, ContentType = 'text/csv', ACL = 'private')
@@ -123,7 +140,7 @@ def handler(event, context):
 
 	# check if an email was submitted to env variables, else skip
 	if re.search('@', dest_email):
-		send_email(githubuser, scanuuid, dest_email, res, tableheader, s3signed)
+		send_email(githubuser, scanuuid, dest_email, meta_res, tableheader, s3signed)
 
 	# return bucket name and file path
 	print(s3signed)
