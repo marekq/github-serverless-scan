@@ -7,23 +7,25 @@ patch_all()
 
 
 # create connection to s3, dynamodb and ses
-s3 = boto3.client('s3')
-
 ddb_scan = boto3.resource('dynamodb', region_name = os.environ['AWS_REGION']).Table(os.environ['dynamo_scan_table'])
 ddb_meta = boto3.resource('dynamodb', region_name = os.environ['AWS_REGION']).Table(os.environ['dynamo_meta_table'])
 ses = boto3.client('ses')
+s3 = boto3.client('s3')
+
 
 # get s3 bucket name and ses destination email from env var
 s3_bucket = os.environ['s3_bucket']
 dest_email = os.environ['dest_email']
 from_email = os.environ['from_email']
 
+
 # set the s3 signed url expiry to one day
 s3_link_expiry = 86400
 
+
 # optional - send email to receiver
 @xray_recorder.capture("send_email")
-def send_email(githubuser, scanuuid, dest_email, res, tableheader, s3signed):
+def send_email(githubuser, scanuuid, dest_email, res, s3signed):
 
 		# create a simple html body for the email
 		mailmsg = '<html><body><h2>report for ' + githubuser + '</h2><br>'
@@ -32,7 +34,7 @@ def send_email(githubuser, scanuuid, dest_email, res, tableheader, s3signed):
 		mailmsg += '<a href = ' + s3signed + '>link to csv file</a><br><table><br>'
 
 		# create the table header row
-		mailmsg += '<tr><th>' + tableheader + '</th></tr>'
+		mailmsg += '<tr><th>repo</th><th>gituser</th><th>findings</th></tr>'
 
 		# create a table row per dynamodb row
 		for x in res:
@@ -63,19 +65,31 @@ def send_email(githubuser, scanuuid, dest_email, res, tableheader, s3signed):
 		print('sent email with subject ' + mailsubj + ' to ' + dest_email)
 
 
-# lambda handler
-@xray_recorder.capture("handler")
-def handler(event, context):
-	meta_res = []
+# retrieve the dynamodb scan data
+@xray_recorder.capture("get_ddb_scan")
+def get_ddb_scan(scanuuid):
+
 	scan_res = []
+	queryres = ddb_scan.query(IndexName = 'scantable_uuid', KeyConditionExpression = Key('scan_uuid').eq(scanuuid))
 
-	# retrieve the scan id from step functions input
-	scanuuid = str(event['Data'][0]['ScanID'])
+	for x in queryres['Items']:
+		scan_res.append(x)
 
-	# retrieve the github user name from step function input
-	githubuser = str(event['Data'][0]['GithubRepo'])
+	# paginate through scan data results
+	while 'LastEvaluatedKey' in queryres:
+		lastkey = queryres['LastEvaluatedKey']
+		queryres = ddb_scan.query(IndexName = 'scantable_uuid', KeyConditionExpression = Key('scan_uuid').eq(scanuuid), ExclusiveStartKey = lastkey)
 
-	# retrieve the dynamodb metadata data
+		for x in queryres['Items']:
+			scan_res.append(x)
+
+	return scan_res
+
+# retrieve the dynamodb metadata data
+@xray_recorder.capture("get_ddb_meta")
+def get_ddb_meta(scanuuid):
+
+	meta_res = []
 	queryres = ddb_meta.query(IndexName = 'metatable_scan_uuid', KeyConditionExpression = Key('scan_uuid').eq(scanuuid) & Key('count_finding').gte(0), ProjectionExpression = 'count_finding, gituser, gitrepo')
 
 	for x in queryres['Items']:
@@ -89,21 +103,13 @@ def handler(event, context):
 		for x in queryres['Items']:
 			meta_res.append(x)
 
+	return meta_res
 
-	# retrieve the dynamodb scan data
-	queryres = ddb_scan.query(IndexName = 'scantable_uuid', KeyConditionExpression = Key('scan_uuid').eq(scanuuid), ProjectionExpression = 'count_finding, gituser, gitrepo')
 
-	for x in queryres['Items']:
-		scan_res.append(x)
-
-	# paginate through scan data results
-	while 'LastEvaluatedKey' in queryres:
-		lastkey = queryres['LastEvaluatedKey']
-		queryres = ddb_scan.query(IndexName = 'scantable_uuid', KeyConditionExpression = Key('scan_uuid').eq(scanuuid), ProjectionExpression = 'count_finding, gituser, gitrepo', ExclusiveStartKey = lastkey)
-
-		for x in queryres['Items']:
-			scan_res.append(x)
-
+# write the csv file to /tmp
+@xray_recorder.capture("write_file")
+def write_file(scan_res):
+	
 	# open the file for writing 
 	filen = open('/tmp/out.csv', 'w') 
 	
@@ -112,7 +118,6 @@ def handler(event, context):
 	
 	# set count to 0 
 	count = 0
-	tableheader = ''
 
 	# iterate over results
 	for x in scan_res: 
@@ -120,7 +125,6 @@ def handler(event, context):
 	
 			# write the csv header
 			csv_writer.writerow(x.keys())
-			tableheader = '</th><th>'.join(x.keys())
 			count += 1
 	
 		# write the csv record
@@ -128,6 +132,24 @@ def handler(event, context):
 	
 	# close the file
 	filen.close() 
+
+
+# lambda handler
+@xray_recorder.capture("handler")
+def handler(event, context):
+
+	# retrieve the scan id from step functions input
+	scanuuid = str(event['Data'][0]['ScanID'])
+
+	# retrieve the github user name from step function input
+	githubuser = str(event['Data'][0]['GithubRepo'])
+
+	# get scan and metadata data from dynamodb
+	meta_res = get_ddb_meta(scanuuid)
+	scan_res = get_ddb_scan(scanuuid)
+
+	# write file
+	write_file(scan_res)
 
 	# create s3 filename
 	s3filename = githubuser + "_" + scanuuid + ".csv"
@@ -140,7 +162,7 @@ def handler(event, context):
 
 	# check if an email was submitted to env variables, else skip
 	if re.search('@', dest_email):
-		send_email(githubuser, scanuuid, dest_email, meta_res, tableheader, s3signed)
+		send_email(githubuser, scanuuid, dest_email, meta_res, s3signed)
 
 	# return bucket name and file path
 	print(s3signed)
