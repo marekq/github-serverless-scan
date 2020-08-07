@@ -104,7 +104,7 @@ Resources:
       Tracing: Active
       Description: Store scan results from DynamoDB
       MemorySize: 256
-      Timeout: 30
+      Timeout: 120
       Environment: 
         Variables:
           dynamo_meta_table: !Ref metadatatable
