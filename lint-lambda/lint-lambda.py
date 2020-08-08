@@ -183,7 +183,11 @@ def check_cfnfile(cfnfile, gitpath, gitrepo, filename, tmppath, scan_uuid, keywo
         for keyword in keywords:
 
             # check if the keyword exists in line
-            if re.search(keyword, line):
+            pat = re.compile(keyword, re.IGNORECASE)
+
+            # if keyword pattern is found in file
+            if pat.search(line) != None:
+
                 found_keyword = keyword.strip()
                 check_type = 'check_keyword'
 
