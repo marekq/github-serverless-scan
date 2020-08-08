@@ -285,6 +285,8 @@ CodePipelineReadOnlyPolicy
 CodeUri
 ComprehendBasicAccessPolicy
 CostExplorerReadOnlyPolicy
+DeadLetterQueue
+DeploymentPreference
 DynamoDBBackupFullAccessPolicy
 DynamoDBCrudPolicy
 DynamoDBReadPolicy
@@ -305,18 +307,24 @@ ElasticMapReduceSetTerminationProtectionPolicy
 ElasticMapReduceTerminateJobFlowsPolicy
 ElasticsearchHttpPostPolicy
 EventBridgePutEventsPolicy
+EventInvokeConfig
 FilterLogEventsPolicy
 FirehoseCrudPolicy
 FirehoseWritePolicy
+Handler
+InlineCode
 KMSDecryptPolicy
 KMSEncryptPolicy
 KinesisCrudPolicy
 KinesisStreamReadPolicy
 LambdaInvokePolicy
+Layers
+MemorySize
 MobileAnalyticsWriteOnlyAccessPolicy
 OrganizationsListAccountsPolicy
 PinpointEndpointAccessPolicy
 PollyFullAccessPolicy
+ProvisionedConcurrencyConfig
 RekognitionDetectOnlyPolicy
 RekognitionFacesManagementPolicy
 RekognitionFacesPolicy
@@ -325,11 +333,20 @@ RekognitionNoDataAccessPolicy
 RekognitionReadPolicy
 RekognitionWriteOnlyAccessPolicy
 ReservedConcurrentExecutions
+Runtime: dotnetcore1.0
+Runtime: dotnetcore2.0
+Runtime: dotnetcore2.1
+Runtime: dotnetcore3.1
 Runtime: go1.x
 Runtime: java11
 Runtime: java8
 Runtime: nodejs10.x
 Runtime: nodejs12.x
+Runtime: nodejs4.3
+Runtime: nodejs4.3-edge
+Runtime: nodejs6.10
+Runtime: nodejs8.10
+Runtime: provided
 Runtime: python2.6
 Runtime: python2.7
 Runtime: python3.6
