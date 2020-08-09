@@ -76,8 +76,9 @@ def get_repo(repoid, scan_uuid, keywords, githubtoken):
                         zipfiles.append(filename)
                         zipObj.extract(path = tmppath, member = filename)
 
-                        # get the location of the unzipped file
+                        # get the location of the unzipped file and the gitfile path without local /tmp dir
                         tmpfile = tmppath + '/' + filename
+                        gitfile = '/'.join(filename.split('/')[1:])
 
                         # read the template, replace invalid chars
                         f = open(tmpfile, errors = 'replace').read()
@@ -91,8 +92,8 @@ def get_repo(repoid, scan_uuid, keywords, githubtoken):
                             print("??? scanning file " + giturl + " " + gitpath + " " + filename)
                             
                             # scan the cfnfile and check for keywords, add the output count 
-                            count += run_lint(tmpfile, gitpath, giturl, filename, tmppath, scan_uuid, githubres)
-                            count += check_cfnfile(tmpfile, gitpath, giturl, filename, tmppath, scan_uuid, keywords, githubres)
+                            count += run_lint(tmpfile, gitpath, giturl, filename, gitfile, scan_uuid, githubres)
+                            count += check_cfnfile(tmpfile, gitpath, giturl, filename, gitfile, scan_uuid, keywords, githubres)
 
                         else:
 
@@ -132,7 +133,7 @@ def put_ddb_metadata(scan_uuid, gitpath, count_finding):
 
 # put dynamodb scan result record
 @xray_recorder.capture("put_ddb_result")
-def put_ddb_result(gitrepo, gitpath, check_id, check_full, check_line_id, check_type, filename, tmppath, scan_uuid, githubres):
+def put_ddb_result(gitrepo, gitpath, check_id, check_full, check_line_id, check_type, filename, gitfile, scan_uuid, githubres):
 
     # get current time
     timest = int(time.time())
@@ -145,11 +146,11 @@ def put_ddb_result(gitrepo, gitpath, check_id, check_full, check_line_id, check_
         'gitfile' : gitpath + "/" + filename + ":" + check_line_id,
         'gitprofile' : gitprofile,
         'gitrepo' : gitrepo,
-        'file_url' : "https://github.com/" + gitpath + "/blob/master/" + filename + "#L" + check_line_id,
+        'file_url' : "https://github.com/" + gitpath + "/blob/master/" + gitfile + "#L" + check_line_id,
         'file_name' : filename,
         'check_line_id' : int(check_line_id),
         'timest': timest,
-        'check_text': check_full.strip(),
+        'check_text': check_full.strip().replace('\n', ''),
         'check_id': check_id,
         'check_type': check_type,
         'scan_uuid': scan_uuid,
@@ -171,7 +172,7 @@ def put_ddb_result(gitrepo, gitpath, check_id, check_full, check_line_id, check_
 
 # check the yaml file for serverless lines
 @xray_recorder.capture("check_cfnfile")
-def check_cfnfile(cfnfile, gitpath, gitrepo, filename, tmppath, scan_uuid, keywords, githubres):
+def check_cfnfile(cfnfile, gitpath, gitrepo, filename, gitfile, scan_uuid, keywords, githubres):
     check_line_id = 0
     check_count = 0
 
@@ -192,8 +193,7 @@ def check_cfnfile(cfnfile, gitpath, gitrepo, filename, tmppath, scan_uuid, keywo
                 check_type = 'check_keyword'
 
                 # put a dynamodb record for the found keyword
-                put_ddb_result(gitrepo, gitpath, found_keyword, found_keyword, str(check_line_id), check_type, filename, tmppath, scan_uuid, githubres)
-
+                put_ddb_result(gitrepo, gitpath, found_keyword, found_keyword, str(check_line_id), check_type, filename, gitfile, scan_uuid, githubres)
                 # increase count by 1
                 check_count += 1
 
@@ -207,7 +207,7 @@ def check_cfnfile(cfnfile, gitpath, gitrepo, filename, tmppath, scan_uuid, keywo
 
 # run cfn-lint
 @xray_recorder.capture("run_lint")
-def run_lint(cfnfile, gitpath, gitrepo, filename, tmppath, scan_uuid, githubres):
+def run_lint(cfnfile, gitpath, gitrepo, filename, gitfile, scan_uuid, githubres):
 
     # load the cfnfile
     template, matches = decode.decode(cfnfile, False)
@@ -231,7 +231,7 @@ def run_lint(cfnfile, gitpath, gitrepo, filename, tmppath, scan_uuid, githubres)
             check_line_id = str(check_full).split(":")[-1]
             count += 1
 
-            put_ddb_result(gitrepo, gitpath, check_id, str(check_full), check_line_id, check_type, filename, tmppath, scan_uuid, githubres)
+            put_ddb_result(gitrepo, gitpath, check_id, str(check_full), check_line_id, check_type, filename, gitfile, scan_uuid, githubres)
 
     except Exception as e:
         print('!!! error reading ' + gitpath + " " + filename + " " + str(e))
