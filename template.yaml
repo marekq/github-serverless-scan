@@ -162,7 +162,7 @@ Resources:
         AttributeType: S
       - AttributeName: scan_uuid
         AttributeType: S
-      - AttributeName: count_finding
+      - AttributeName: finding_count
         AttributeType: N
       KeySchema:
       - AttributeName: gituser
@@ -175,7 +175,7 @@ Resources:
         KeySchema:
         - AttributeName: scan_uuid
           KeyType: HASH
-        - AttributeName: count_finding
+        - AttributeName: finding_count
           KeyType: RANGE
         Projection:
           ProjectionType: ALL

@@ -90,7 +90,7 @@ def get_ddb_scan(scanuuid):
 def get_ddb_meta(scanuuid):
 
 	meta_res = []
-	queryres = ddb_meta.query(IndexName = 'metatable_scan_uuid', KeyConditionExpression = Key('scan_uuid').eq(scanuuid) & Key('count_finding').gte(0), ProjectionExpression = 'count_finding, gituser, gitrepo', ScanIndexForward = False)
+	queryres = ddb_meta.query(IndexName = 'metatable_scan_uuid', KeyConditionExpression = Key('scan_uuid').eq(scanuuid) & Key('count_finding').gte(0), ProjectionExpression = 'finding_count, keyword_count, cfnlint_count, gituser, gitrepo', ScanIndexForward = False)
 
 	for x in queryres['Items']:
 		meta_res.append(x)
@@ -98,7 +98,7 @@ def get_ddb_meta(scanuuid):
 	# paginate through scan data results
 	while 'LastEvaluatedKey' in queryres:
 		lastkey = queryres['LastEvaluatedKey']
-		queryres = ddb_meta.query(IndexName = 'metatable_scan_uuid', KeyConditionExpression = Key('scan_uuid').eq(scanuuid) & Key('count_finding').gte(0), ProjectionExpression = 'count_finding, gituser, gitrepo', ScanIndexForward = False, ExclusiveStartKey = lastkey)
+		queryres = ddb_meta.query(IndexName = 'metatable_scan_uuid', KeyConditionExpression = Key('scan_uuid').eq(scanuuid) & Key('count_finding').gte(0), ProjectionExpression = 'finding_count, keyword_count, cfnlint_count, gituser, gitrepo', ScanIndexForward = False, ExclusiveStartKey = lastkey)
 
 		for x in queryres['Items']:
 			meta_res.append(x)

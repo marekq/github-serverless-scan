@@ -40,7 +40,8 @@ def load_keywords():
 def get_repo(repoid, scan_uuid, keywords, githubtoken):
 
     # create check count
-    count = 0
+    keyword_count = 0
+    cfnlint_count = 0
     
     # get the github repo details
     githubres = Github(githubtoken).get_repo(int(repoid))
@@ -92,8 +93,8 @@ def get_repo(repoid, scan_uuid, keywords, githubtoken):
                             print("??? scanning file " + giturl + " " + gitpath + " " + filename)
                             
                             # scan the cfnfile and check for keywords, add the output count 
-                            count += run_lint(tmpfile, gitpath, giturl, filename, gitfile, scan_uuid, githubres)
-                            count += check_cfnfile(tmpfile, gitpath, giturl, filename, gitfile, scan_uuid, keywords, githubres)
+                            cfnlint_count += run_lint(tmpfile, gitpath, giturl, filename, gitfile, scan_uuid, githubres)
+                            keyword_count += check_cfnfile(tmpfile, gitpath, giturl, filename, gitfile, scan_uuid, keywords, githubres)
 
                         else:
 
@@ -103,12 +104,12 @@ def get_repo(repoid, scan_uuid, keywords, githubtoken):
         print("--- error - " + gitpath + " size " + str(gitsize))
 
     # return count and gitpath
-    return int(count), gitpath
+    return int(cfnlint_count), int(keyword_count), gitpath
 
 
 # put dynamodb metadata record
 @xray_recorder.capture("put_ddb_metadata")
-def put_ddb_metadata(scan_uuid, gitpath, count_finding):
+def put_ddb_metadata(scan_uuid, gitpath, keyword_count, cfnlint_count):
 
     # get current time
     timest = int(time.time())
@@ -122,7 +123,9 @@ def put_ddb_metadata(scan_uuid, gitpath, count_finding):
         'gitrepo' : gitrepo,
         'timest': int(timest),
         'scan_uuid': scan_uuid,
-        'count_finding': int(count_finding)
+        'keyword_count': int(keyword_count),
+        'cfnlint_count': int(cfnlint_count),
+        'finding_count': int(keyword_count) + int(cfnlint_count)
     }
 
     # put the item into dynamodb
@@ -194,6 +197,7 @@ def check_cfnfile(cfnfile, gitpath, gitrepo, filename, gitfile, scan_uuid, keywo
 
                 # put a dynamodb record for the found keyword
                 put_ddb_result(gitrepo, gitpath, found_keyword, found_keyword, str(check_line_id), check_type, filename, gitfile, scan_uuid, githubres)
+
                 # increase count by 1
                 check_count += 1
 
@@ -213,7 +217,7 @@ def run_lint(cfnfile, gitpath, gitrepo, filename, gitfile, scan_uuid, githubres)
     template, matches = decode.decode(cfnfile, False)
 
     # set counter to 0
-    count = 0
+    check_count = 0
 
     # process all the rules 
     try:
@@ -229,14 +233,14 @@ def run_lint(cfnfile, gitpath, gitrepo, filename, gitfile, scan_uuid, githubres)
         for check_full in matches:
             check_id = str(check_full)[1:6]
             check_line_id = str(check_full).split(":")[-1]
-            count += 1
+            check_count += 1
 
             put_ddb_result(gitrepo, gitpath, check_id, str(check_full), check_line_id, check_type, filename, gitfile, scan_uuid, githubres)
 
     except Exception as e:
         print('!!! error reading ' + gitpath + " " + filename + " " + str(e))
 
-    return count
+    return check_count
 
 
 # lambda handler
@@ -256,10 +260,10 @@ def handler(event, context):
     repoid, scan_uuid = msg.split(',')
 
     # get the git repo, return the amount of detections for the repo
-    count_finding, gitpath = get_repo(repoid, scan_uuid, keywords, githubtoken)
+    keyword_count, cfnlint_count, gitpath = get_repo(repoid, scan_uuid, keywords, githubtoken)
 
     # return dynamodb scan id and write metadata record
     print("^^^ ddbscan uuid " + str(scan_uuid))
-    put_ddb_metadata(scan_uuid, gitpath, count_finding)
+    put_ddb_metadata(scan_uuid, gitpath, keyword_count, cfnlint_count)
 
-    return {str(gitpath): str(count_finding)}
+    return {'gitpath': str(gitpath), 'keyword_count': str(keyword_count), 'cfnlint_count': str(cfnlint_count)}
