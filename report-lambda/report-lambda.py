@@ -34,11 +34,12 @@ def send_email(githubuser, scanuuid, dest_email, res, s3signed):
 		mailmsg += '<a href = ' + s3signed + '>link to csv file</a><br><table><br>'
 
 		# create the table header row
-		mailmsg += '<tr><th>repo</th><th>gituser</th><th>findings</th></tr>'
+		mailmsg += '<tr><th>gituser</th><th>gitrepo</th><th>cfnlint findings</th><th>keyword findings</th><th>total findings</th></tr>'
 
 		# create a table row per dynamodb row
 		for x in res:
-			mailmsg += '<tr><td>' + '</td><td>'.join(map(str, x.values())) + '</td></tr>'
+			mailmsg += '<tr><td>' + str(x['gituser']) + '</td><td>' + str(x['gitrepo']) + '</td><td>' + str(x['cfnlint_count']) 
+			mailmsg += '</td><td>' + str(x['keyword_count']) + '</td><td>' + str(x['finding_count']) + '</td></tr>'
 
 		mailmsg += '</table></body></html>'
 
@@ -90,7 +91,7 @@ def get_ddb_scan(scanuuid):
 def get_ddb_meta(scanuuid):
 
 	meta_res = []
-	queryres = ddb_meta.query(IndexName = 'metatable_scan_uuid', KeyConditionExpression = Key('scan_uuid').eq(scanuuid) & Key('count_finding').gte(0), ProjectionExpression = 'finding_count, keyword_count, cfnlint_count, gituser, gitrepo', ScanIndexForward = False)
+	queryres = ddb_meta.query(IndexName = 'metatable_scan_uuid', KeyConditionExpression = Key('scan_uuid').eq(scanuuid) & Key('finding_count').gte(0), ScanIndexForward = False)
 
 	for x in queryres['Items']:
 		meta_res.append(x)
@@ -98,7 +99,7 @@ def get_ddb_meta(scanuuid):
 	# paginate through scan data results
 	while 'LastEvaluatedKey' in queryres:
 		lastkey = queryres['LastEvaluatedKey']
-		queryres = ddb_meta.query(IndexName = 'metatable_scan_uuid', KeyConditionExpression = Key('scan_uuid').eq(scanuuid) & Key('count_finding').gte(0), ProjectionExpression = 'finding_count, keyword_count, cfnlint_count, gituser, gitrepo', ScanIndexForward = False, ExclusiveStartKey = lastkey)
+		queryres = ddb_meta.query(IndexName = 'metatable_scan_uuid', KeyConditionExpression = Key('scan_uuid').eq(scanuuid) & Key('finding_count').gte(0), ScanIndexForward = False, ExclusiveStartKey = lastkey)
 
 		for x in queryres['Items']:
 			meta_res.append(x)

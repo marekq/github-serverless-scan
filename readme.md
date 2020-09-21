@@ -32,6 +32,7 @@ Roadmap
 
 - [ ] Add CDK support if this is feasible to run in Lambda in order to run 'cdk synth' to generate CloudFormation output. This would allow CDK repo's to be scanned for misconfigurations as well. 
 - [ ] Add other security infrastructure as code scanning software, such as Checkov. 
+- [ ] Add X-Ray support for the Step Function once it is available in AWS SAM. 
 - [X] Create an easy export function to generate reports (i.e. as a CSV file or as a CloudWatch/QuickSight dashboard). 
 - [X] Convert the SQS setup to Step Functions, in order to provide more powerful scanning patterns and better debugging of scan results. 
 - [X] Add more intelligent retrieval of feature branches, right now only the main one is downloaded.
